@@ -21,6 +21,20 @@ document.getElementById('loginLogoImg').src = EMRS_LOGO_BASE64;
 // shared login in Firebase Authentication.
 
 const auth = firebase.auth();
+
+// Tab-scoped session: closing the browser tab signs the user out, so the shared login
+// can't be left open indefinitely on a shared/public device. This intentionally has
+// NOTHING to do with network connectivity — a login session doesn't need continuous
+// internet to stay valid, and tying it to connectivity would risk logging someone out
+// mid-form purely from a brief WiFi/mobile-data blip, which is exactly the kind of data
+// loss this app is built to avoid. A form's typed content is never touched by an auth
+// state change anyway (see onAuthStateChanged below) — only a successful Submit clears
+// the form, by design.
+auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(function() {
+  // If this fails for any reason, Firebase just falls back to its default persistence
+  // rather than breaking login entirely — not worth surfacing to the user.
+});
+
 const loginOverlay = document.getElementById('loginOverlay');
 
 auth.onAuthStateChanged(function(user) {
