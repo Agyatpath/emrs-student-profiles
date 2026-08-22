@@ -239,6 +239,8 @@ document.addEventListener('input', function(e) {
 /* ------------------------- PHOTO: compress client-side before storing ------------------------- */
 
 let photoBase64 = '';
+let editingDocId = null;
+let editingOriginalTimestamp = null;
 document.getElementById('photoInput').addEventListener('change', function(e) {
   const file = e.target.files[0];
   const preview = document.getElementById('photoPreview');
@@ -275,6 +277,61 @@ tabFill.addEventListener('click', function() {
 tabManage.addEventListener('click', function() {
   tabManage.classList.add('active'); tabFill.classList.remove('active');
   fillView.classList.remove('active'); manageView.classList.add('active');
+});
+
+/* ------------------------- EDIT AN EXISTING STUDENT ------------------------- */
+// Loads a previously-submitted student's data back into the Fill Form so it can be
+// corrected and resubmitted. On save, this updates the SAME Firestore document instead
+// of creating a new one (see the submit handler's editingDocId branch).
+
+function populateFormFields(s) {
+  SECTIONS.forEach(function(section) {
+    section.fields.forEach(function(f) {
+      if (f.type === 'fixed' || f.type === 'photo' || f.type === 'houseSelect') return;
+      const el = document.querySelector('[name="' + f.key + '"]');
+      if (el) el.value = s[f.key] || '';
+    });
+  });
+  const houseSelect = document.querySelector('[name="house"]');
+  if (houseSelect && s.house && s.category) houseSelect.value = s.house + ' - ' + s.category;
+
+  photoBase64 = s.photoBase64 || '';
+  const preview = document.getElementById('photoPreview');
+  preview.innerHTML = photoBase64 ? '<img src="' + photoBase64 + '">' : 'No photo';
+}
+
+function populateSubjectsFromData(subj) {
+  if (!subj) return;
+  const names = subj.subjectNames || [];
+  for (let col = 0; col < NUM_SUBJECT_COLS; col++) {
+    const input = document.querySelector('.subjNameInput[data-col="' + col + '"]');
+    if (input) input.value = names[col] || '';
+  }
+  (subj.assessments || []).forEach(function(a) {
+    const maxInput = document.querySelector('.subjMaxMarks[data-row="' + a.key + '"]');
+    if (maxInput) maxInput.value = a.maxMarks || '';
+    (a.marks || []).forEach(function(m, col) {
+      const marksInput = document.querySelector('.subjMarks[data-col="' + col + '"][data-row="' + a.key + '"]');
+      if (marksInput) marksInput.value = m || '';
+    });
+  });
+}
+
+function loadStudentIntoForm(s) {
+  editingDocId = s._id;
+  editingOriginalTimestamp = s.timestamp || null;
+  populateFormFields(s);
+  populateSubjectsFromData(s.subjects);
+  document.getElementById('submitBtn').textContent = 'Update';
+  document.getElementById('editBanner').style.display = 'flex';
+  document.getElementById('editBannerName').textContent = s.fullName || '';
+  tabFill.click();
+  window.scrollTo(0, 0);
+}
+
+document.getElementById('cancelEditBtn').addEventListener('click', function() {
+  // Simplest reliable way to fully clear edit state and every field is a fresh load.
+  window.location.reload();
 });
 
 /* ------------------------- POPULATE SEARCH / MERGE DROPDOWNS ------------------------- */
@@ -318,7 +375,6 @@ document.getElementById('profileForm').addEventListener('submit', function(e) {
   data.category = parts[1];
 
   data.subjects = collectSubjectsData();
-  data.timestamp = firebase.firestore.FieldValue.serverTimestamp();
 
   btn.disabled = true;
   status.className = '';
@@ -329,7 +385,16 @@ document.getElementById('profileForm').addEventListener('submit', function(e) {
   // easily have hiccupped in that time. This makes the final submit noticeably more
   // resilient to a single transient network blip rather than failing outright.
   function submitWithRetry(attemptsLeft) {
-    return db.collection('students').add(data).catch(function(err) {
+    let writePromise;
+    if (editingDocId) {
+      data.timestamp = editingOriginalTimestamp || firebase.firestore.FieldValue.serverTimestamp();
+      data.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+      writePromise = db.collection('students').doc(editingDocId).set(data);
+    } else {
+      data.timestamp = firebase.firestore.FieldValue.serverTimestamp();
+      writePromise = db.collection('students').add(data);
+    }
+    return writePromise.catch(function(err) {
       if (attemptsLeft <= 0) throw err;
       status.innerHTML = '<span class="spinner dark"></span>Connection hiccup, retrying...';
       return new Promise(function(resolve) { setTimeout(resolve, 1500); })
@@ -337,16 +402,17 @@ document.getElementById('profileForm').addEventListener('submit', function(e) {
     });
   }
 
+  const wasEditing = !!editingDocId;
   submitWithRetry(2)
     .then(function() {
       status.className = 'ok';
-      status.textContent = 'Saved successfully! Starting a fresh form for the next student...';
+      status.textContent = (wasEditing ? 'Updated successfully!' : 'Saved successfully!') + ' Starting a fresh form for the next student...';
       setTimeout(function() { window.location.reload(); }, 1500);
     })
     .catch(function(err) {
       btn.disabled = false;
       status.className = 'error';
-      status.textContent = 'Error: ' + err.message + ' — please try Submit again; your entered data is still filled in.';
+      status.textContent = 'Error: ' + err.message + ' — please try ' + (wasEditing ? 'Update' : 'Submit') + ' again; your entered data is still filled in.';
     });
 });
 
@@ -395,8 +461,11 @@ document.getElementById('searchBtn').addEventListener('click', function() {
           '<div class="name">' + r.fullName + '</div>' +
           '<div class="meta">Class ' + r.className + r.section + ' &middot; ' + r.house + ' - ' + r.category + '</div>' +
         '</div>' +
-        '<button type="button">Download</button>';
-      const dlBtn = card.querySelector('button');
+        '<div style="display:flex;gap:6px;flex-shrink:0;">' +
+          '<button type="button" class="secondary editBtn">Edit</button>' +
+          '<button type="button" class="dlBtn">Download</button>' +
+        '</div>';
+      const dlBtn = card.querySelector('.dlBtn');
       dlBtn.addEventListener('click', function() {
         dlBtn.disabled = true;
         dlBtn.innerHTML = '<span class="spinner"></span>';
@@ -410,6 +479,10 @@ document.getElementById('searchBtn').addEventListener('click', function() {
           dlBtn.textContent = 'Download';
           alert('Error generating PDF: ' + err.message);
         });
+      });
+      const editBtn = card.querySelector('.editBtn');
+      editBtn.addEventListener('click', function() {
+        loadStudentIntoForm(r);
       });
       resultsList.appendChild(card);
     });
@@ -595,10 +668,10 @@ function buildFullStudentHtml(d, photoDataUrl) {
   html += '</table>';
 
   html += '<div class="pdfSigRow">' +
-    '<div class="pdfSigBox"><div class="pdfSigLine">&nbsp;</div>Student</div>' +
-    '<div class="pdfSigBox"><div class="pdfSigLine">&nbsp;</div>Guardian/Parent</div>' +
-    '<div class="pdfSigBox"><div class="pdfSigLine">&nbsp;</div>H.M.</div>' +
-    '<div class="pdfSigBox"><div class="pdfSigLine">&nbsp;</div>Principal</div>' +
+    '<div class="pdfSigBox"><div class="pdfSigLine">&nbsp;</div>Student Signature</div>' +
+    '<div class="pdfSigBox"><div class="pdfSigLine">&nbsp;</div>Guardian/Parent Signature</div>' +
+    '<div class="pdfSigBox"><div class="pdfSigLine">&nbsp;</div>H.M. Signature</div>' +
+    '<div class="pdfSigBox"><div class="pdfSigLine">&nbsp;</div>Principal Signature</div>' +
     '</div>';
 
   html += '</div>'; // .pdfContent
