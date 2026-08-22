@@ -324,7 +324,20 @@ document.getElementById('profileForm').addEventListener('submit', function(e) {
   status.className = '';
   status.innerHTML = '<span class="spinner dark"></span>Saving...';
 
-  db.collection('students').add(data)
+  // Retries a couple of times with a short backoff before giving up — a form this long
+  // may sit open for many minutes while being filled in, and a mobile connection can
+  // easily have hiccupped in that time. This makes the final submit noticeably more
+  // resilient to a single transient network blip rather than failing outright.
+  function submitWithRetry(attemptsLeft) {
+    return db.collection('students').add(data).catch(function(err) {
+      if (attemptsLeft <= 0) throw err;
+      status.innerHTML = '<span class="spinner dark"></span>Connection hiccup, retrying...';
+      return new Promise(function(resolve) { setTimeout(resolve, 1500); })
+        .then(function() { return submitWithRetry(attemptsLeft - 1); });
+    });
+  }
+
+  submitWithRetry(2)
     .then(function() {
       status.className = 'ok';
       status.textContent = 'Saved successfully! Starting a fresh form for the next student...';
@@ -333,7 +346,7 @@ document.getElementById('profileForm').addEventListener('submit', function(e) {
     .catch(function(err) {
       btn.disabled = false;
       status.className = 'error';
-      status.textContent = 'Error: ' + err.message;
+      status.textContent = 'Error: ' + err.message + ' — please try Submit again; your entered data is still filled in.';
     });
 });
 
@@ -380,272 +393,4 @@ document.getElementById('searchBtn').addEventListener('click', function() {
       card.innerHTML =
         '<div class="info">' +
           '<div class="name">' + r.fullName + '</div>' +
-          '<div class="meta">Class ' + r.className + r.section + ' &middot; ' + r.house + ' - ' + r.category + '</div>' +
-        '</div>' +
-        '<button type="button">Download</button>';
-      const dlBtn = card.querySelector('button');
-      dlBtn.addEventListener('click', function() {
-        dlBtn.disabled = true;
-        dlBtn.innerHTML = '<span class="spinner"></span>';
-        generateStudentPdf(r).then(function(pdf) {
-          dlBtn.disabled = false;
-          dlBtn.textContent = 'Download';
-          const filename = (r.fullName || 'Student').replace(/[^a-z0-9]/gi, '_') + '_' + r.className + r.section + '.pdf';
-          pdf.save(filename);
-        }).catch(function(err) {
-          dlBtn.disabled = false;
-          dlBtn.textContent = 'Download';
-          alert('Error generating PDF: ' + err.message);
-        });
-      });
-      resultsList.appendChild(card);
-    });
-  }).catch(function(err) {
-    btn.disabled = false;
-    status.textContent = 'Error: ' + err.message;
-  });
-});
-
-/* ------------------------- MERGE (Download All in a House) ------------------------- */
-
-document.getElementById('mergeBtn').addEventListener('click', function() {
-  const btn = this;
-  const status = document.getElementById('mergeStatus');
-  const house = document.getElementById('mergeHouse').value;
-  const category = document.getElementById('mergeCategory').value;
-
-  btn.disabled = true;
-  status.innerHTML = '<span class="spinner dark"></span>Fetching students...';
-
-  let query = db.collection('students').where('house', '==', house);
-  if (category !== 'All') query = query.where('category', '==', category);
-
-  query.get().then(function(snap) {
-    const students = [];
-    snap.forEach(function(doc) { students.push(doc.data()); });
-    if (!students.length) {
-      btn.disabled = false;
-      status.textContent = 'No submitted students found for ' + house + ' / ' + category + '.';
-      return;
-    }
-    let doc = null;
-    let i = 0;
-    function next() {
-      if (i >= students.length) {
-        btn.disabled = false;
-        status.textContent = 'Merged ' + students.length + ' student(s).';
-        doc.save(house + '_' + category.replace(/\s+/g, '') + '_Combined_' + students.length + 'students.pdf');
-        return;
-      }
-      status.innerHTML = '<span class="spinner dark"></span>Rendering ' + (i + 1) + ' of ' + students.length + '...';
-      renderStudentIntoDoc(doc, students[i], i > 0).then(function(d) {
-        doc = d;
-        i++;
-        setTimeout(next, 10);
-      }).catch(function(err) {
-        btn.disabled = false;
-        status.textContent = 'Error on student ' + (i + 1) + ': ' + err.message;
-      });
-    }
-    next();
-  }).catch(function(err) {
-    btn.disabled = false;
-    status.textContent = 'Error: ' + err.message;
-  });
-});
-
-/* ============================================================================
-   PDF RENDERING ENGINE — builds the same branded two-page layout as before,
-   but rendered by the real browser (via html2canvas) into a jsPDF document.
-   This is what finally gives us working watermark opacity and true Garamond.
-   ========================================================================== */
-
-function esc(v) {
-  if (v === undefined || v === null) return '';
-  const div = document.createElement('div');
-  div.textContent = String(v);
-  return div.innerHTML;
-}
-
-function row2(a, va, b, vb) {
-  return '<tr><td class="pdfLbl">' + esc(a) + '</td><td class="pdfVal">' + esc(va) + '</td>' +
-    '<td class="pdfLbl">' + esc(b || '') + '</td><td class="pdfVal">' + esc(vb || '') + '</td></tr>';
-}
-
-function fullRow(label, val) {
-  return '<tr><td class="pdfLbl">' + esc(label) + '</td>' +
-    '<td class="pdfVal" colspan="3"><div class="pdfWideBox">' + esc(val) + '</div></td></tr>';
-}
-
-function fieldRows(keys, d) {
-  let html = '';
-  for (let i = 0; i < keys.length; i += 2) {
-    const k1 = keys[i], k2 = keys[i + 1];
-    html += row2(FIELD_LABELS[k1], d[k1], k2 ? FIELD_LABELS[k2] : '', k2 ? d[k2] : '');
-  }
-  return html;
-}
-
-function buildSubjectsTableHtml(subjects) {
-  subjects = subjects || { subjectNames: [], assessments: [] };
-  let names = subjects.subjectNames || [];
-  while (names.length < 7) names = names.concat(['']);
-  names = names.slice(0, 7);
-  const byKey = {};
-  (subjects.assessments || []).forEach(function(a) { byKey[a.key] = a; });
-
-  let html = '<table class="pdfResultsTable"><tr><th>Assessment</th><th>Max<br>Marks</th>';
-  names.forEach(function(n) { html += '<th>' + esc(n) + '</th>'; });
-  html += '</tr>';
-  ASSESSMENT_ROWS.forEach(function(r) {
-    const a = byKey[r[1]] || {};
-    const marks = a.marks || [];
-    html += '<tr><td class="pdfRowLbl">' + r[0] + '</td><td class="pdfMaxCol">' + esc(a.maxMarks) + '</td>';
-    for (let i = 0; i < 7; i++) html += '<td>' + esc(marks[i]) + '</td>';
-    html += '</tr>';
-  });
-  html += '</table>';
-  return html;
-}
-
-// One continuous flowing document (no artificial page split) — a "band" of watermark
-// divs is pre-placed at regular intervals so whichever physical pages this content ends
-// up sliced into (see renderStudentIntoDoc below), each one has a watermark on it.
-const PAGE_HEIGHT_CSS_PX = 1123; // A4 height at the same 96dpi scale as the 794px-wide container
-const MAX_EXPECTED_PAGES = 5;
-
-function buildWatermarkBands() {
-  let html = '';
-  for (let i = 0; i < MAX_EXPECTED_PAGES; i++) {
-    const top = i * PAGE_HEIGHT_CSS_PX + (PAGE_HEIGHT_CSS_PX - 460) / 2;
-    html += '<div class="pdfWatermarkBand" style="top:' + top + 'px;background-image:url(' + EMRS_LOGO_BASE64 + ');"></div>';
-  }
-  return html;
-}
-
-function buildFullStudentHtml(d, photoDataUrl) {
-  let html = buildWatermarkBands();
-  html += '<div class="pdfContent">';
-  html += '<table class="pdfHeaderTable"><tr>';
-  html += '<td class="pdfHLogo"><img src="' + EMRS_LOGO_BASE64 + '"></td>';
-  html += '<td class="pdfHCenter"><div class="pdfSchoolName">EKLAVYA MODEL RESIDENTIAL SCHOOL, BANSLA-BAGIDORA</div>' +
-    '<div class="pdfFormTitle">STUDENT PROFILE</div></td>';
-  html += '<td class="pdfHPhoto"><div class="pdfPhotoBox">' + (photoDataUrl ? '<img src="' + photoDataUrl + '">' : 'Photo') + '</div></td>';
-  html += '</tr></table>';
-
-  html += '<table class="pdfTopInfo">';
-  html += row2('Name', d.fullName, 'Class', d.className);
-  html += row2('Section', d.section, 'House', d.house);
-  html += row2('Category (Hostel)', d.category, 'Date of Birth', d.dob);
-  html += '</table>';
-
-  html += '<div class="pdfSectionTitle">Contact Information</div><table class="pdfFieldTable">';
-  html += fieldRows(['gender','email','distanceFromSchool','aadhaarNo','phone1','phone2','phone3',
-    'fatherName','motherName','fatherAadhaar','motherAadhaar'], d);
-  html += fullRow('Address', d.address);
-  html += '</table>';
-
-  html += '<div class="pdfSectionTitle">Personal Information</div><table class="pdfFieldTable">';
-  html += fieldRows(['caste','casteCategory','bloodGroup','religion','age','satsNo','penNo',
-    'nearestRelative','nearestRelativeMobile'], d);
-  html += '</table>';
-
-  html += '<div class="pdfSectionTitle">Family Information</div><table class="pdfFieldTable">';
-  html += fieldRows(['parentsEmployer','fatherOccupation','motherOccupation','singleParentChild',
-    'guardianParent','guardianMobile','guardianOccupation','guardianEducation','workingFamilyMembers'], d);
-  html += '</table>';
-
-  html += '<div class="pdfSectionTitle">Health Information</div><table class="pdfFieldTable">';
-  html += fieldRows(['medicalConditions','allergies','specialNeeds','parentsLivingStatus','guardianName',
-    'medications','annualFamilyIncome','primaryLanguage'], d);
-  html += '</table>';
-
-  html += '<div class="pdfSectionTitle">Family Background</div><table class="pdfFieldTable">';
-  html += fieldRows(['familyType','siblingsSister','siblingsBrother','fatherEducation','motherEducation',
-    'emergencyContact','height','weight','mbs','chest'], d);
-  html += '</table>';
-
-  html += '<div class="pdfSectionTitle">Academic Information</div><table class="pdfFieldTable">';
-  html += fieldRows(['otherRelevantInfo','specialEducationalNeeds','strengths','areasOfImprovement',
-    'previousClass','lastYearResult','previousSchool','academicAchievements'], d);
-  html += '</table>';
-
-  html += '<div class="pdfSectionTitle">Additional Information (By HM or CT)</div><table class="pdfFieldTable">';
-  html += row2('Hobbies/Interests', d.hobbies, 'Learning Difficulties (Previous)', d.learningDifficulties);
-  html += '</table>';
-
-  html += '<div class="pdfSectionTitle">Current Year Results</div>';
-  html += buildSubjectsTableHtml(d.subjects);
-
-  html += '<div class="pdfSectionTitle">Comments</div><table class="pdfFieldTable">';
-  html += row2("Teacher's Comments", d.teacherComments, "House Master's Comments", d.houseMasterComments);
-  html += '</table>';
-
-  html += '<div class="pdfSigRow">' +
-    '<div class="pdfSigBox"><div class="pdfSigLine">&nbsp;</div>Student Signature</div>' +
-    '<div class="pdfSigBox"><div class="pdfSigLine">&nbsp;</div>Guardian/Parent Signature</div>' +
-    '<div class="pdfSigBox"><div class="pdfSigLine">&nbsp;</div>H.M. Signature</div>' +
-    '<div class="pdfSigBox"><div class="pdfSigLine">&nbsp;</div>Principal Signature</div>' +
-    '</div>';
-
-  html += '</div>'; // .pdfContent
-  return html;
-}
-
-function renderFullCanvas(data) {
-  return new Promise(function(resolve, reject) {
-    const root = document.getElementById('pdfRoot');
-    root.innerHTML = '<div class="pdfFlow" id="pdfFlowEl">' + buildFullStudentHtml(data, data.photoBase64 || '') + '</div>';
-    setTimeout(function() {
-      html2canvas(document.getElementById('pdfFlowEl'), { scale: 2, useCORS: true }).then(resolve).catch(reject);
-    }, 60);
-  });
-}
-
-// Renders one student into the given jsPDF doc, slicing their actual rendered content
-// into as many full A4 pages as it genuinely needs — no forced two-page split, no
-// shrink-to-fit side margins. The content is then stretched vertically (very slightly,
-// usually) so the LAST page is also completely filled edge-to-edge rather than trailing
-// off into blank space — every page this student uses is fully covered, always.
-// Pass doc=null to create a new one. Pass isNotFirstStudent=true when appending another
-// student to an existing merged PDF.
-async function renderStudentIntoDoc(doc, data, isNotFirstStudent) {
-  const isVeryFirstPage = !doc;
-  if (!doc) doc = new jspdf.jsPDF({ unit: 'mm', format: 'a4' });
-
-  const rawCanvas = await renderFullCanvas(data);
-  const pageHeightPx = rawCanvas.width * (297 / 210);
-  const naturalPages = rawCanvas.height / pageHeightPx;
-  // Small epsilon avoids bumping to an extra page purely from sub-pixel rounding.
-  const targetPages = Math.max(1, Math.ceil(naturalPages - 0.02));
-  const targetHeightPx = targetPages * pageHeightPx;
-
-  // Stretch (never shrink/crop) the full rendered content so it exactly fills a whole
-  // number of pages with zero leftover blank space at the end.
-  let bigCanvas = rawCanvas;
-  if (targetHeightPx > rawCanvas.height) {
-    const stretched = document.createElement('canvas');
-    stretched.width = rawCanvas.width;
-    stretched.height = targetHeightPx;
-    const sctx = stretched.getContext('2d');
-    sctx.drawImage(rawCanvas, 0, 0, rawCanvas.width, rawCanvas.height, 0, 0, rawCanvas.width, targetHeightPx);
-    bigCanvas = stretched;
-  }
-
-  for (let p = 0; p < targetPages; p++) {
-    if (!(isVeryFirstPage && p === 0)) doc.addPage();
-    const sliceCanvas = document.createElement('canvas');
-    sliceCanvas.width = bigCanvas.width;
-    sliceCanvas.height = pageHeightPx;
-    const ctx = sliceCanvas.getContext('2d');
-    ctx.drawImage(bigCanvas, 0, p * pageHeightPx, bigCanvas.width, pageHeightPx, 0, 0, bigCanvas.width, pageHeightPx);
-    const imgData = sliceCanvas.toDataURL('image/jpeg', 0.92);
-    doc.addImage(imgData, 'JPEG', 0, 0, 210, 297);
-  }
-  return doc;
-}
-
-// Generates a single student's PDF (for the Manage-tab Download button).
-async function generateStudentPdf(data) {
-  return renderStudentIntoDoc(null, data, false);
-}
+          '<div class="meta">Class ' + r.className + r.section + ' &middot; ' + r.house + ' - ' + r.category + '</div>'
