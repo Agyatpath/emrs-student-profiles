@@ -595,10 +595,10 @@ function buildFullStudentHtml(d, photoDataUrl) {
   html += '</table>';
 
   html += '<div class="pdfSigRow">' +
-    '<div class="pdfSigBox"><div class="pdfSigLine">&nbsp;</div>Student Signature</div>' +
-    '<div class="pdfSigBox"><div class="pdfSigLine">&nbsp;</div>Guardian/Parent Signature</div>' +
-    '<div class="pdfSigBox"><div class="pdfSigLine">&nbsp;</div>H.M. Signature</div>' +
-    '<div class="pdfSigBox"><div class="pdfSigLine">&nbsp;</div>Principal Signature</div>' +
+    '<div class="pdfSigBox"><div class="pdfSigLine">&nbsp;</div>Student</div>' +
+    '<div class="pdfSigBox"><div class="pdfSigLine">&nbsp;</div>Guardian/Parent</div>' +
+    '<div class="pdfSigBox"><div class="pdfSigLine">&nbsp;</div>H.M.</div>' +
+    '<div class="pdfSigBox"><div class="pdfSigLine">&nbsp;</div>Principal</div>' +
     '</div>';
 
   html += '</div>'; // .pdfContent
