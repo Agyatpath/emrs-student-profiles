@@ -605,32 +605,97 @@ function buildFullStudentHtml(d, photoDataUrl) {
   return html;
 }
 
-function renderFullCanvas(data) {
+// A scaled override stylesheet for the hidden PDF template. Rather than resizing the
+// final image (which would distort text), this actually shrinks font sizes and spacing
+// and lets the content genuinely reflow smaller — the only way to fit more real content
+// into the same physical page size without anything looking stretched or squashed.
+function pdfScaledStyleTag(scale) {
+  const px = function(base) { return Math.round(base * scale * 10) / 10; };
+  return '<style>' +
+    '.pdfFlow{font-size:' + px(14.5) + 'px;padding:' + px(24) + 'px ' + px(32) + 'px;}' +
+    '.pdfSchoolName{font-size:' + px(16.5) + 'px;}' +
+    '.pdfFormTitle{font-size:' + px(14) + 'px;}' +
+    '.pdfHeaderTable{margin-bottom:' + px(16) + 'px;}' +
+    'table.pdfTopInfo td, table.pdfFieldTable td{padding:' + px(5) + 'px ' + px(9) + 'px;font-size:' + px(14.5) + 'px;}' +
+    '.pdfWideBox{min-height:' + px(42) + 'px;}' +
+    '.pdfSectionTitle{font-size:' + px(14) + 'px;padding:' + px(5) + 'px ' + px(11) + 'px;margin-top:' + px(11) + 'px;margin-bottom:' + px(6) + 'px;}' +
+    'table.pdfResultsTable th{padding:' + px(6) + 'px ' + px(2) + 'px;font-size:' + px(13) + 'px;}' +
+    'table.pdfResultsTable td{padding:' + px(4) + 'px;font-size:' + px(12.5) + 'px;}' +
+    '.pdfSigRow{margin-top:' + px(34) + 'px;font-size:' + px(13.5) + 'px;}' +
+    '.pdfSigLine{height:' + px(36) + 'px;margin-bottom:' + px(6) + 'px;}' +
+    '</style>';
+}
+
+function renderFullCanvas(data, scale) {
   return new Promise(function(resolve, reject) {
     const root = document.getElementById('pdfRoot');
-    root.innerHTML = '<div class="pdfFlow" id="pdfFlowEl">' + buildFullStudentHtml(data, data.photoBase64 || '') + '</div>';
+    root.innerHTML = pdfScaledStyleTag(scale) +
+      '<div class="pdfFlow" id="pdfFlowEl">' + buildFullStudentHtml(data, data.photoBase64 || '') + '</div>';
     setTimeout(function() {
       html2canvas(document.getElementById('pdfFlowEl'), { scale: 2, useCORS: true }).then(resolve).catch(reject);
     }, 60);
   });
 }
 
-// Renders one student into the given jsPDF doc, slicing their actual rendered content
-// into as many full A4 pages as it genuinely needs — no forced two-page split, and no
-// vertical stretching either (that made content look artificially elongated). If the
-// last page's content doesn't reach the bottom, it's simply left blank there rather
-// than distorting anything to fill it. Each page is placed with a small margin on all
-// four sides. Pass doc=null to create a new one. Pass isNotFirstStudent=true when
-// appending another student to an existing merged PDF.
+// Renders one student into the given jsPDF doc, fit to exactly 2 A4 pages whenever
+// possible — in BOTH directions:
+//   - If content is too long, it's re-rendered smaller (real reflow, not an image
+//     resize) until it fits within 2 pages, tried a few times.
+//   - If content is short enough to leave a large blank gap at the bottom of page 2
+//     (more than ~1/4 of the page), it's re-rendered LARGER instead, so it fills most
+//     of page 2 with only a small, natural-looking gap left (roughly 1/5 of a page).
+// Growing is capped at a sensible maximum so very sparse content doesn't get blown up
+// to an unnaturally huge size. If content doesn't fit within 2 pages even at the
+// smallest readable size, it's allowed to spill onto a 3rd page rather than silently
+// cutting off real data.
+// Pass doc=null to create a new one. Pass isNotFirstStudent=true when appending another
+// student to an existing merged PDF.
 const PDF_MARGIN_MM = 10;
+const TARGET_PAGES = 2;
+const MIN_SCALE = 0.55;
+const MAX_SCALE = 1.4;
+const GROW_IF_BELOW = 1.75;   // natural pages below this would leave >25% of page 2 blank
+const GROW_TARGET = 1.82;     // aim to fill up to here (~18% blank — within the 1/5-1/4 range)
 
 async function renderStudentIntoDoc(doc, data, isNotFirstStudent) {
   const isVeryFirstPage = !doc;
   if (!doc) doc = new jspdf.jsPDF({ unit: 'mm', format: 'a4' });
 
-  const bigCanvas = await renderFullCanvas(data);
-  const pageHeightPx = bigCanvas.width * (297 / 210); // full-page aspect, before margin is applied
-  const numPages = Math.max(1, Math.ceil(bigCanvas.height / pageHeightPx));
+  let scale = 1;
+  let bigCanvas = await renderFullCanvas(data, scale);
+  let pageHeightPx = bigCanvas.width * (297 / 210);
+  let pagesNeeded = bigCanvas.height / pageHeightPx;
+
+  let attempts = 0;
+  if (pagesNeeded > TARGET_PAGES + 0.02) {
+    // Too long — shrink until it fits within 2 pages.
+    while (pagesNeeded > TARGET_PAGES + 0.02 && scale > MIN_SCALE && attempts < 3) {
+      scale = Math.max(MIN_SCALE, scale * (TARGET_PAGES / pagesNeeded) * 0.97);
+      bigCanvas = await renderFullCanvas(data, scale);
+      pageHeightPx = bigCanvas.width * (297 / 210);
+      pagesNeeded = bigCanvas.height / pageHeightPx;
+      attempts++;
+    }
+  } else if (pagesNeeded < GROW_IF_BELOW) {
+    // Too short — grow so page 2 doesn't end up mostly empty.
+    while (pagesNeeded < GROW_IF_BELOW && scale < MAX_SCALE && attempts < 3) {
+      scale = Math.min(MAX_SCALE, scale * (GROW_TARGET / pagesNeeded) * 1.0);
+      bigCanvas = await renderFullCanvas(data, scale);
+      pageHeightPx = bigCanvas.width * (297 / 210);
+      pagesNeeded = bigCanvas.height / pageHeightPx;
+      attempts++;
+      // Don't let growing accidentally push it over 2 pages — back off one step if so.
+      if (pagesNeeded > TARGET_PAGES + 0.02) {
+        scale = scale * 0.94;
+        bigCanvas = await renderFullCanvas(data, scale);
+        pageHeightPx = bigCanvas.width * (297 / 210);
+        pagesNeeded = bigCanvas.height / pageHeightPx;
+        break;
+      }
+    }
+  }
+
+  const numPages = Math.max(1, Math.ceil(pagesNeeded - 0.02));
 
   // Fit each full-page-aspect slice inside a margin-inset box, preserving aspect ratio
   // (so nothing looks stretched/squashed), centered within the page.
