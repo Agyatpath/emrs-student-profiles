@@ -616,36 +616,21 @@ function renderFullCanvas(data) {
 }
 
 // Renders one student into the given jsPDF doc, slicing their actual rendered content
-// into as many full A4 pages as it genuinely needs — no forced two-page split, no
-// shrink-to-fit distortion. The content is then stretched vertically (very slightly,
-// usually) so the LAST page is also completely filled rather than trailing off into
-// blank space. Each page is placed with a small margin on all four sides.
-// Pass doc=null to create a new one. Pass isNotFirstStudent=true when appending another
-// student to an existing merged PDF.
+// into as many full A4 pages as it genuinely needs — no forced two-page split, and no
+// vertical stretching either (that made content look artificially elongated). If the
+// last page's content doesn't reach the bottom, it's simply left blank there rather
+// than distorting anything to fill it. Each page is placed with a small margin on all
+// four sides. Pass doc=null to create a new one. Pass isNotFirstStudent=true when
+// appending another student to an existing merged PDF.
 const PDF_MARGIN_MM = 10;
 
 async function renderStudentIntoDoc(doc, data, isNotFirstStudent) {
   const isVeryFirstPage = !doc;
   if (!doc) doc = new jspdf.jsPDF({ unit: 'mm', format: 'a4' });
 
-  const rawCanvas = await renderFullCanvas(data);
-  const pageHeightPx = rawCanvas.width * (297 / 210); // full-page aspect, before margin is applied
-  const naturalPages = rawCanvas.height / pageHeightPx;
-  // Small epsilon avoids bumping to an extra page purely from sub-pixel rounding.
-  const targetPages = Math.max(1, Math.ceil(naturalPages - 0.02));
-  const targetHeightPx = targetPages * pageHeightPx;
-
-  // Stretch (never shrink/crop) the full rendered content so it exactly fills a whole
-  // number of pages with zero leftover blank space at the end.
-  let bigCanvas = rawCanvas;
-  if (targetHeightPx > rawCanvas.height) {
-    const stretched = document.createElement('canvas');
-    stretched.width = rawCanvas.width;
-    stretched.height = targetHeightPx;
-    const sctx = stretched.getContext('2d');
-    sctx.drawImage(rawCanvas, 0, 0, rawCanvas.width, rawCanvas.height, 0, 0, rawCanvas.width, targetHeightPx);
-    bigCanvas = stretched;
-  }
+  const bigCanvas = await renderFullCanvas(data);
+  const pageHeightPx = bigCanvas.width * (297 / 210); // full-page aspect, before margin is applied
+  const numPages = Math.max(1, Math.ceil(bigCanvas.height / pageHeightPx));
 
   // Fit each full-page-aspect slice inside a margin-inset box, preserving aspect ratio
   // (so nothing looks stretched/squashed), centered within the page.
@@ -654,13 +639,16 @@ async function renderStudentIntoDoc(doc, data, isNotFirstStudent) {
   if (renderH > boxH) { renderH = boxH; renderW = boxH * (210 / 297); }
   const xOffset = (210 - renderW) / 2, yOffset = (297 - renderH) / 2;
 
-  for (let p = 0; p < targetPages; p++) {
+  for (let p = 0; p < numPages; p++) {
     if (!(isVeryFirstPage && p === 0)) doc.addPage();
+    const sliceH = Math.min(pageHeightPx, bigCanvas.height - p * pageHeightPx);
     const sliceCanvas = document.createElement('canvas');
     sliceCanvas.width = bigCanvas.width;
     sliceCanvas.height = pageHeightPx;
     const ctx = sliceCanvas.getContext('2d');
-    ctx.drawImage(bigCanvas, 0, p * pageHeightPx, bigCanvas.width, pageHeightPx, 0, 0, bigCanvas.width, pageHeightPx);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
+    ctx.drawImage(bigCanvas, 0, p * pageHeightPx, bigCanvas.width, sliceH, 0, 0, bigCanvas.width, sliceH);
     const imgData = sliceCanvas.toDataURL('image/jpeg', 0.92);
     doc.addImage(imgData, 'JPEG', xOffset, yOffset, renderW, renderH);
   }
