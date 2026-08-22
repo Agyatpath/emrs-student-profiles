@@ -9,7 +9,7 @@
 
 const HOUSES = ['Brahmaputra', 'Ganga', 'Godavari', 'Tapi'];
 const CATEGORIES = ['Junior Girls', 'Junior Boys', 'Senior Girls', 'Senior Boys'];
-const ASSESSMENT_ROWS = [['FA-1','fa1'],['FA-2','fa2'],['FA-3','fa3'],['FA-4','fa4'],['SA-1','sa1'],['SA-2','sa2']];
+const ASSESSMENT_ROWS = [['PT1','pt1'],['PT2','pt2'],['HY','hy'],['PT3','pt3'],['PT4','pt4'],['Y/B','yb'],['Pre B1','preb1'],['Pre B2','preb2']];
 const NUM_SUBJECT_COLS = 7;
 
 document.getElementById('brandLogoImg').src = EMRS_LOGO_BASE64;
@@ -508,8 +508,23 @@ function buildSubjectsTableHtml(subjects) {
   return html;
 }
 
-function buildPage1Html(d, photoDataUrl) {
-  let html = '<div class="pdfWatermark" style="background-image:url(' + EMRS_LOGO_BASE64 + ');background-size:cover;"></div>';
+// One continuous flowing document (no artificial page split) — a "band" of watermark
+// divs is pre-placed at regular intervals so whichever physical pages this content ends
+// up sliced into (see renderStudentIntoDoc below), each one has a watermark on it.
+const PAGE_HEIGHT_CSS_PX = 1123; // A4 height at the same 96dpi scale as the 794px-wide container
+const MAX_EXPECTED_PAGES = 5;
+
+function buildWatermarkBands() {
+  let html = '';
+  for (let i = 0; i < MAX_EXPECTED_PAGES; i++) {
+    const top = i * PAGE_HEIGHT_CSS_PX + (PAGE_HEIGHT_CSS_PX - 460) / 2;
+    html += '<div class="pdfWatermarkBand" style="top:' + top + 'px;background-image:url(' + EMRS_LOGO_BASE64 + ');"></div>';
+  }
+  return html;
+}
+
+function buildFullStudentHtml(d, photoDataUrl) {
+  let html = buildWatermarkBands();
   html += '<div class="pdfContent">';
   html += '<table class="pdfHeaderTable"><tr>';
   html += '<td class="pdfHLogo"><img src="' + EMRS_LOGO_BASE64 + '"></td>';
@@ -550,14 +565,6 @@ function buildPage1Html(d, photoDataUrl) {
     'emergencyContact','height','weight','mbs','chest'], d);
   html += '</table>';
 
-  html += '</div>'; // .pdfContent
-  return html;
-}
-
-function buildPage2Html(d) {
-  let html = '<div class="pdfWatermark" style="background-image:url(' + EMRS_LOGO_BASE64 + ');background-size:cover;"></div>';
-  html += '<div class="pdfContent">';
-
   html += '<div class="pdfSectionTitle">Academic Information</div><table class="pdfFieldTable">';
   html += fieldRows(['otherRelevantInfo','specialEducationalNeeds','strengths','areasOfImprovement',
     'previousClass','lastYearResult','previousSchool','academicAchievements'], d);
@@ -585,36 +592,56 @@ function buildPage2Html(d) {
   return html;
 }
 
-function renderPageToDoc(doc, innerHtml) {
+function renderFullCanvas(data) {
   return new Promise(function(resolve, reject) {
     const root = document.getElementById('pdfRoot');
-    root.innerHTML = '<div class="pdfPage" id="pdfPageEl">' + innerHtml + '</div>';
+    root.innerHTML = '<div class="pdfFlow" id="pdfFlowEl">' + buildFullStudentHtml(data, data.photoBase64 || '') + '</div>';
     setTimeout(function() {
-      html2canvas(document.getElementById('pdfPageEl'), { scale: 2, useCORS: true }).then(function(canvas) {
-        const imgData = canvas.toDataURL('image/jpeg', 0.92);
-        const pageWidth = 210, pageHeight = 297;
-        const ratio = canvas.height / canvas.width;
-        let renderWidth = pageWidth, renderHeight = pageWidth * ratio;
-        if (renderHeight > pageHeight) { renderHeight = pageHeight; renderWidth = pageHeight / ratio; }
-        const xOffset = (pageWidth - renderWidth) / 2;
-        doc.addImage(imgData, 'JPEG', xOffset, 0, renderWidth, renderHeight);
-        resolve();
-      }).catch(reject);
+      html2canvas(document.getElementById('pdfFlowEl'), { scale: 2, useCORS: true }).then(resolve).catch(reject);
     }, 60);
   });
 }
 
-// Renders one student (2 pages) into the given jsPDF doc. Pass doc=null to create a new
-// one. Pass isNotFirstStudent=true when appending to an existing multi-student merged PDF.
+// Renders one student into the given jsPDF doc, slicing their actual rendered content
+// into as many full A4 pages as it genuinely needs — no forced two-page split, no
+// shrink-to-fit side margins. The content is then stretched vertically (very slightly,
+// usually) so the LAST page is also completely filled edge-to-edge rather than trailing
+// off into blank space — every page this student uses is fully covered, always.
+// Pass doc=null to create a new one. Pass isNotFirstStudent=true when appending another
+// student to an existing merged PDF.
 async function renderStudentIntoDoc(doc, data, isNotFirstStudent) {
-  if (!doc) {
-    doc = new jspdf.jsPDF({ unit: 'mm', format: 'a4' });
-  } else if (isNotFirstStudent) {
-    doc.addPage();
+  const isVeryFirstPage = !doc;
+  if (!doc) doc = new jspdf.jsPDF({ unit: 'mm', format: 'a4' });
+
+  const rawCanvas = await renderFullCanvas(data);
+  const pageHeightPx = rawCanvas.width * (297 / 210);
+  const naturalPages = rawCanvas.height / pageHeightPx;
+  // Small epsilon avoids bumping to an extra page purely from sub-pixel rounding.
+  const targetPages = Math.max(1, Math.ceil(naturalPages - 0.02));
+  const targetHeightPx = targetPages * pageHeightPx;
+
+  // Stretch (never shrink/crop) the full rendered content so it exactly fills a whole
+  // number of pages with zero leftover blank space at the end.
+  let bigCanvas = rawCanvas;
+  if (targetHeightPx > rawCanvas.height) {
+    const stretched = document.createElement('canvas');
+    stretched.width = rawCanvas.width;
+    stretched.height = targetHeightPx;
+    const sctx = stretched.getContext('2d');
+    sctx.drawImage(rawCanvas, 0, 0, rawCanvas.width, rawCanvas.height, 0, 0, rawCanvas.width, targetHeightPx);
+    bigCanvas = stretched;
   }
-  await renderPageToDoc(doc, buildPage1Html(data, data.photoBase64 || ''));
-  doc.addPage();
-  await renderPageToDoc(doc, buildPage2Html(data));
+
+  for (let p = 0; p < targetPages; p++) {
+    if (!(isVeryFirstPage && p === 0)) doc.addPage();
+    const sliceCanvas = document.createElement('canvas');
+    sliceCanvas.width = bigCanvas.width;
+    sliceCanvas.height = pageHeightPx;
+    const ctx = sliceCanvas.getContext('2d');
+    ctx.drawImage(bigCanvas, 0, p * pageHeightPx, bigCanvas.width, pageHeightPx, 0, 0, bigCanvas.width, pageHeightPx);
+    const imgData = sliceCanvas.toDataURL('image/jpeg', 0.92);
+    doc.addImage(imgData, 'JPEG', 0, 0, 210, 297);
+  }
   return doc;
 }
 
