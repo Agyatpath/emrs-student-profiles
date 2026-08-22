@@ -13,6 +13,47 @@ const ASSESSMENT_ROWS = [['PT1','pt1'],['PT2','pt2'],['HY','hy'],['PT3','pt3'],[
 const NUM_SUBJECT_COLS = 7;
 
 document.getElementById('brandLogoImg').src = EMRS_LOGO_BASE64;
+document.getElementById('loginLogoImg').src = EMRS_LOGO_BASE64;
+
+/* ------------------------- LOGIN GATE ------------------------- */
+// Real security lives in the Firestore rules (they require request.auth != null) —
+// this is just the UI half of that. See SETUP_INSTRUCTIONS.md for creating the one
+// shared login in Firebase Authentication.
+
+const auth = firebase.auth();
+const loginOverlay = document.getElementById('loginOverlay');
+
+auth.onAuthStateChanged(function(user) {
+  document.body.classList.remove('authChecking');
+  if (user) {
+    loginOverlay.classList.remove('active');
+  } else {
+    loginOverlay.classList.add('active');
+  }
+});
+
+document.getElementById('loginForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+  const btn = document.getElementById('loginSubmitBtn');
+  errEl.textContent = '';
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Signing in...';
+  auth.signInWithEmailAndPassword(email, password)
+    .catch(function(err) {
+      errEl.textContent = 'Incorrect login ID or password.';
+    })
+    .finally(function() {
+      btn.disabled = false;
+      btn.textContent = 'Log In';
+    });
+});
+
+document.getElementById('logoutBtn').addEventListener('click', function() {
+  auth.signOut();
+});
 
 /* ------------------------- FIELD CONFIG ------------------------- */
 // Each field: { key, label, type, required, numeric, maxLength, options, wide, textSize }
@@ -229,7 +270,7 @@ document.addEventListener('input', function(e) {
 document.addEventListener('input', function(e) {
   const el = e.target;
   const isFreeText = (el.tagName === 'TEXTAREA') || (el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'email'));
-  if (isFreeText && !el.classList.contains('numOnly') && !el.disabled) {
+  if (isFreeText && !el.classList.contains('numOnly') && !el.disabled && el.id !== 'loginEmail' && el.id !== 'loginPassword') {
     const start = el.selectionStart, end = el.selectionEnd;
     el.value = el.value.toUpperCase();
     if (start !== null) el.setSelectionRange(start, end);
@@ -341,12 +382,18 @@ document.getElementById('cancelEditBtn').addEventListener('click', function() {
   const searchClass = document.getElementById('searchClass');
   const mergeHouse = document.getElementById('mergeHouse');
   const mergeCategory = document.getElementById('mergeCategory');
+  const exportHouse = document.getElementById('exportHouse');
+  const exportCategory = document.getElementById('exportCategory');
   HOUSES.forEach(function(h) {
     searchHouse.innerHTML += '<option value="' + h + '">' + h + '</option>';
     mergeHouse.innerHTML += '<option value="' + h + '">' + h + '</option>';
+    exportHouse.innerHTML += '<option value="' + h + '">' + h + '</option>';
   });
   for (let c = 6; c <= 12; c++) searchClass.innerHTML += '<option value="' + c + '">' + c + '</option>';
-  CATEGORIES.forEach(function(c) { mergeCategory.innerHTML += '<option value="' + c + '">' + c + '</option>'; });
+  CATEGORIES.forEach(function(c) {
+    mergeCategory.innerHTML += '<option value="' + c + '">' + c + '</option>';
+    exportCategory.innerHTML += '<option value="' + c + '">' + c + '</option>';
+  });
 })();
 
 /* ------------------------- SUBMIT ------------------------- */
@@ -534,6 +581,72 @@ document.getElementById('mergeBtn').addEventListener('click', function() {
       });
     }
     next();
+  }).catch(function(err) {
+    btn.disabled = false;
+    status.textContent = 'Error: ' + err.message;
+  });
+});
+
+/* ------------------------- EXPORT STUDENT LIST (Excel/CSV) ------------------------- */
+
+document.getElementById('exportCsvBtn').addEventListener('click', function() {
+  const btn = this;
+  const status = document.getElementById('exportStatus');
+  const house = document.getElementById('exportHouse').value; // '' = all houses
+  const category = document.getElementById('exportCategory').value;
+
+  btn.disabled = true;
+  status.innerHTML = '<span class="spinner dark"></span>Fetching students...';
+
+  let query = db.collection('students');
+  if (house) query = query.where('house', '==', house);
+  if (category !== 'All') query = query.where('category', '==', category);
+
+  query.get().then(function(snap) {
+    btn.disabled = false;
+    const rows = [];
+    snap.forEach(function(doc) { rows.push(doc.data()); });
+
+    if (!rows.length) {
+      status.textContent = 'No students found for that selection.';
+      return;
+    }
+
+    // Sorted house-wise: House, then Class, then Section, then Name.
+    rows.sort(function(a, b) {
+      if ((a.house || '') !== (b.house || '')) return (a.house || '').localeCompare(b.house || '');
+      if (String(a.className) !== String(b.className)) return Number(a.className) - Number(b.className);
+      if ((a.section || '') !== (b.section || '')) return (a.section || '').localeCompare(b.section || '');
+      return (a.fullName || '').localeCompare(b.fullName || '');
+    });
+
+    function csvEscape(v) {
+      v = (v === undefined || v === null) ? '' : String(v);
+      if (/[",\n]/.test(v)) v = '"' + v.replace(/"/g, '""') + '"';
+      return v;
+    }
+
+    const headers = ['House', 'Category', 'Class', 'Section', 'Student Name',
+      "Father's Name", "Mother's Name", 'Aadhaar No.', 'Mobile No.', 'Date of Birth'];
+    let csv = headers.map(csvEscape).join(',') + '\r\n';
+    rows.forEach(function(r) {
+      const line = [r.house, r.category, r.className, r.section, r.fullName,
+        r.fatherName, r.motherName, r.aadhaarNo, r.phone1, r.dob];
+      csv += line.map(csvEscape).join(',') + '\r\n';
+    });
+
+    // Leading BOM so Excel correctly detects UTF-8 (avoids garbled characters).
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const houseLabel = house || 'AllHouses';
+    const catLabel = category === 'All' ? 'AllCategories' : category.replace(/\s+/g, '');
+    a.download = houseLabel.replace(/\s+/g, '') + '_' + catLabel + '_StudentList.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    status.textContent = 'Downloaded ' + rows.length + ' student(s).';
   }).catch(function(err) {
     btn.disabled = false;
     status.textContent = 'Error: ' + err.message;

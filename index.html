@@ -26,6 +26,19 @@
     background: var(--ios-bg); margin: 0; color: #1c1c1e; -webkit-font-smoothing: antialiased;
   }
   .container { max-width: 1200px; margin: 0 auto; padding: 0 20px 40px; }
+
+  /* ---- Login gate ---- */
+  body.authChecking .topbar, body.authChecking .container { display: none; }
+  .loginOverlay { display: none; position: fixed; inset: 0; z-index: 300; background: var(--ios-bg); align-items: center; justify-content: center; padding: 20px; }
+  .loginOverlay.active { display: flex; }
+  .loginCard { background: #fff; border-radius: var(--radius); padding: 30px 28px; width: 320px; max-width: 100%; box-shadow: 0 8px 28px rgba(0,0,0,0.14); text-align: center; }
+  .loginCard .loginLogo { width: 56px; height: 56px; border-radius: 12px; margin-bottom: 12px; }
+  .loginCard h2 { color: var(--maroon); font-size: 16.5px; line-height: 1.3; margin: 4px 0 18px; }
+  .loginCard input { width: 100%; margin-bottom: 10px; }
+  .loginCard button { width: 100%; }
+  #loginError { color: #ff3b30; font-size: 12.5px; min-height: 16px; margin-top: 8px; }
+  .logoutBtn { width: auto !important; padding: 6px 12px !important; font-size: 12px !important; min-height: auto !important; flex-shrink: 0; }
+
   .topbar {
     position: sticky; top: 0; z-index: 20; background: rgba(255,255,255,0.92);
     backdrop-filter: saturate(180%) blur(14px); -webkit-backdrop-filter: saturate(180%) blur(14px);
@@ -131,7 +144,23 @@
   .pdfSigLine { border-bottom: 1px solid var(--maroon); height: 36px; margin-bottom: 6px; }
 </style>
 </head>
-<body>
+<body class="authChecking">
+
+<!-- Full-screen login gate. Real security lives in Firestore rules (requires
+     request.auth != null) — this screen is just the UI for that, not the security
+     itself; see SETUP_INSTRUCTIONS.md. -->
+<div id="loginOverlay" class="loginOverlay">
+  <div class="loginCard">
+    <img class="loginLogo" id="loginLogoImg" alt="EMRS">
+    <h2>EMRS Student Profile<br>Sign In</h2>
+    <form id="loginForm" autocomplete="off">
+      <input type="text" id="loginEmail" placeholder="Login ID" autocomplete="username" required>
+      <input type="password" id="loginPassword" placeholder="Password" autocomplete="current-password" required>
+      <button type="submit" id="loginSubmitBtn">Log In</button>
+      <div id="loginError"></div>
+    </form>
+  </div>
+</div>
 
 <div class="topbar">
   <img class="brandLogo" id="brandLogoImg" alt="EMRS">
@@ -139,6 +168,7 @@
     <div class="brandSchool">EKLAVYA MODEL RESIDENTIAL SCHOOL, BANSLA-BAGIDORA</div>
     <div class="brandForm">Student Profile Form</div>
   </div>
+  <button type="button" id="logoutBtn" class="secondary logoutBtn">Log Out</button>
   <div class="segControl">
     <button type="button" id="tabFill" class="active">Fill Form</button>
     <button type="button" id="tabManage">View / Manage</button>
@@ -214,6 +244,25 @@
       <button type="button" id="mergeBtn">Download All (Merged PDF)</button>
       <div id="mergeStatus" class="note" style="margin-top:8px;"></div>
     </fieldset>
+
+    <fieldset>
+      <legend>Export Student List (Excel/CSV)</legend>
+      <div class="note">Downloads a spreadsheet with Student Name, Father's Name, Mother's Name, Aadhaar No., Mobile No., Class &amp; Section, and Date of Birth — sorted house-wise. Opens directly in Excel.</div>
+      <div class="grid">
+        <div class="field">
+          <label>House</label>
+          <select id="exportHouse">
+            <option value="">All Houses</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Category</label>
+          <select id="exportCategory"><option value="All">All Categories</option></select>
+        </div>
+      </div>
+      <button type="button" id="exportCsvBtn">Download Excel/CSV</button>
+      <div id="exportStatus" class="note" style="margin-top:8px;"></div>
+    </fieldset>
   </div>
 </div>
 
@@ -222,6 +271,7 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="logo-data.js"></script>
