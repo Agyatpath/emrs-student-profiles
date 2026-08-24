@@ -77,21 +77,28 @@ const SECTIONS = [
     { key: 'className', label: 'Class', type: 'select', required: true, options: [6,7,8,9,10,11,12] },
     { key: 'section', label: 'Section', type: 'select', required: true, options: ['A','B','Science','Arts'] },
     { key: 'house', label: 'House', type: 'houseSelect', required: true },
-    { key: 'dob', label: 'Date of Birth', type: 'date', required: true },
+    { key: 'dob', label: 'Date of Birth', type: 'dateField', required: true },
     { key: 'gender', label: 'Gender', type: 'select', required: true, options: ['Male','Female'] },
     { key: 'caste', label: 'Caste', type: 'fixed', value: 'BHIL', required: true },
-    { key: 'casteCategory', label: 'Category', type: 'fixed', value: 'ST', required: true },
+    { key: 'casteCategory', label: 'Category', type: 'select', required: true, options: ['Bhil','Meena','Other'] },
     { key: 'photo', label: 'Photo', type: 'photo' }
+  ]},
+  { title: 'Identification & Admission', fields: [
+    { key: 'srAdmissionNo', label: 'SR/Admission No.', type: 'text', numeric: true },
+    { key: 'dateOfAdmission', label: 'Date of Admission', type: 'dateField' },
+    { key: 'apaarId', label: 'APAAR ID', type: 'text', numeric: true },
+    { key: 'abhaId', label: 'ABHA ID', type: 'text', numeric: true }
   ]},
   { title: 'Contact Information', fields: [
     { key: 'fatherName', label: "Father's Name", type: 'text', required: true },
     { key: 'motherName', label: "Mother's Name", type: 'text', required: true },
     { key: 'email', label: 'Email ID', type: 'email' },
     { key: 'distanceFromSchool', label: 'Distance From School (km)', type: 'text', numeric: true },
+    { key: 'pinCode', label: 'PIN Code (6 digits)', type: 'text', numeric: true, maxLength: 6 },
     { key: 'aadhaarNo', label: 'Aadhaar No. (12 digits)', type: 'text', numeric: true, maxLength: 12 },
     { key: 'fatherAadhaar', label: "Father's Aadhaar No. (12 digits)", type: 'text', numeric: true, maxLength: 12 },
     { key: 'motherAadhaar', label: "Mother's Aadhaar No. (12 digits)", type: 'text', numeric: true, maxLength: 12 },
-    { key: 'phone1', label: 'Phone Number (1) (10 digits)', type: 'text', numeric: true, maxLength: 10 },
+    { key: 'phone1', label: 'WhatsApp Number (10 digits)', type: 'text', numeric: true, maxLength: 10, required: true },
     { key: 'phone2', label: 'Phone Number (2) (10 digits)', type: 'text', numeric: true, maxLength: 10 },
     { key: 'phone3', label: 'Phone Number (3) (10 digits)', type: 'text', numeric: true, maxLength: 10 },
     { key: 'address', label: 'Address', type: 'textarea', wide: true, textSize: 'extraTall',
@@ -103,13 +110,16 @@ const SECTIONS = [
     { key: 'religion', label: 'Religion', type: 'select',
       options: ['Hindu','Muslim','Christian','Sikh','Buddhist','Jain','Parsi','Jewish','Other'] },
     { key: 'age', label: 'Age', type: 'text', numeric: true },
-    { key: 'satsNo', label: 'SATS No.', type: 'text' },
     { key: 'penNo', label: 'PEN No. (UDISE)', type: 'text' },
-    { key: 'nearestRelative', label: 'Nearest Relative (Emergency)', type: 'text' },
-    { key: 'nearestRelativeMobile', label: 'Nearest Relative Mob. No. (10 digits)', type: 'text', numeric: true, maxLength: 10 }
+    { key: 'height', label: 'Height (cm)', type: 'text', numeric: true },
+    { key: 'weight', label: 'Weight (kg)', type: 'text', numeric: true },
+    { key: 'bmi', label: 'BMI (kg/m²)', type: 'computed' },
+    { key: 'sickleCell', label: 'Sickle Cell', type: 'select', options: ['Disease','Trait','No'] },
+    { key: 'identityMark', label: 'Identity Mark', type: 'text' },
+    { key: 'povertyLine', label: 'Poverty Line', type: 'select', options: ['APL','BPL'] }
   ]},
   { title: 'Family Information', fields: [
-    { key: 'parentsEmployer', label: "Parent's Employer", type: 'text' },
+    { key: 'parentsEmployer', label: "Parent's Employer", type: 'select', options: ['Government','Private','Self'] },
     { key: 'fatherOccupation', label: "Father's Occupation", type: 'text' },
     { key: 'motherOccupation', label: "Mother's Occupation", type: 'text' },
     { key: 'singleParentChild', label: 'Single Parent Child', type: 'select', options: ['Yes','No'] },
@@ -135,11 +145,13 @@ const SECTIONS = [
     { key: 'siblingsBrother', label: 'Number of Brothers', type: 'text', numeric: true },
     { key: 'fatherEducation', label: "Father's Education", type: 'text' },
     { key: 'motherEducation', label: "Mother's Education", type: 'text' },
-    { key: 'emergencyContact', label: 'Emergency Contact Number (10 digits)', type: 'text', numeric: true, maxLength: 10 },
-    { key: 'height', label: 'Height', type: 'text', numeric: true },
-    { key: 'weight', label: 'Weight', type: 'text', numeric: true },
-    { key: 'mbs', label: 'MBS', type: 'text', numeric: true },
-    { key: 'chest', label: 'Chest', type: 'text', numeric: true }
+    { key: 'emergencyContact', label: 'Emergency Contact Number (10 digits)', type: 'text', numeric: true, maxLength: 10 }
+  ]},
+  { title: 'Bank Details', fields: [
+    { key: 'bankName', label: 'Bank Name', type: 'text' },
+    { key: 'bankAccountName', label: 'Name in Bank Account', type: 'text' },
+    { key: 'ifscCode', label: 'IFSC Code', type: 'text' },
+    { key: 'accountNumber', label: 'Account No.', type: 'text', numeric: true }
   ]},
   { title: 'Academic Information', fields: [
     { key: 'otherRelevantInfo', label: 'Any Other Relevant Information', type: 'textarea' },
@@ -198,6 +210,22 @@ function fieldControlHtml(f) {
     return '<label class="' + reqClass + '">' + f.label + '</label>' +
       '<input type="date" name="' + f.key + '" autocomplete="off" ' + reqAttr + '>';
   }
+  if (f.type === 'dateField') {
+    // Visible text field always shows/accepts DD/MM/YYYY (auto-formatted as typed), plus
+    // a small calendar button that opens a native picker and writes back in the same
+    // DD/MM/YYYY format — so the stored/displayed format is consistent either way.
+    return '<label class="' + reqClass + '">' + f.label + '</label>' +
+      '<div class="dateInputWrap">' +
+        '<input type="text" name="' + f.key + '" class="dateText" placeholder="DD/MM/YYYY" maxlength="10" ' +
+          'pattern="\\d{2}/\\d{2}/\\d{4}" inputmode="numeric" autocomplete="off" ' + reqAttr + '>' +
+        '<button type="button" class="dateCalBtn" aria-label="Open calendar">&#128197;</button>' +
+        '<input type="date" class="dateHidden" tabindex="-1" aria-hidden="true">' +
+      '</div>';
+  }
+  if (f.type === 'computed') {
+    return '<label>' + f.label + '</label>' +
+      '<input type="text" name="' + f.key + '" class="computedField" disabled placeholder="Auto-calculated">';
+  }
   if (f.type === 'textarea') {
     const sizeClass = f.textSize ? ' class="' + f.textSize + '"' : '';
     const ph = f.placeholder ? ' placeholder="' + f.placeholder + '"' : '';
@@ -225,6 +253,65 @@ function renderForm() {
   container.innerHTML = html;
 }
 renderForm();
+
+/* ------------------------- BMI: auto-calculated from Height (cm) + Weight (kg) ------------------------- */
+
+function updateBmi() {
+  const h = parseFloat(document.querySelector('[name="height"]').value);
+  const w = parseFloat(document.querySelector('[name="weight"]').value);
+  const bmiField = document.querySelector('[name="bmi"]');
+  if (!bmiField) return;
+  if (h > 0 && w > 0) {
+    const heightM = h / 100; // Height is entered in cm; BMI formula needs meters
+    const bmi = w / (heightM * heightM);
+    bmiField.value = bmi.toFixed(1) + ' kg/m²';
+  } else {
+    bmiField.value = '';
+  }
+}
+document.addEventListener('input', function(e) {
+  if (e.target.name === 'height' || e.target.name === 'weight') updateBmi();
+});
+
+/* ------------------------- DATE FIELDS: DD/MM/YYYY typing + calendar picker ------------------------- */
+
+function isoToDMY(iso) {
+  if (!iso) return '';
+  const parts = iso.split('-');
+  if (parts.length !== 3) return '';
+  return parts[2] + '/' + parts[1] + '/' + parts[0];
+}
+function dmyToIso(dmy) {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(dmy || '');
+  if (!m) return '';
+  return m[3] + '-' + m[2] + '-' + m[1];
+}
+
+document.addEventListener('input', function(e) {
+  if (!e.target.classList.contains('dateText')) return;
+  let v = e.target.value.replace(/[^\d]/g, '');
+  if (v.length > 2) v = v.slice(0, 2) + '/' + v.slice(2);
+  if (v.length > 5) v = v.slice(0, 5) + '/' + v.slice(5, 9);
+  e.target.value = v;
+});
+
+document.addEventListener('click', function(e) {
+  if (!e.target.classList.contains('dateCalBtn')) return;
+  const wrap = e.target.closest('.dateInputWrap');
+  const hidden = wrap.querySelector('.dateHidden');
+  const text = wrap.querySelector('.dateText');
+  const iso = dmyToIso(text.value);
+  if (iso) hidden.value = iso;
+  if (hidden.showPicker) { try { hidden.showPicker(); } catch (err) { hidden.click(); } }
+  else hidden.click();
+});
+
+document.addEventListener('change', function(e) {
+  if (!e.target.classList.contains('dateHidden')) return;
+  const wrap = e.target.closest('.dateInputWrap');
+  const text = wrap.querySelector('.dateText');
+  text.value = isoToDMY(e.target.value);
+});
 
 /* ------------------------- SUBJECTS GRID ------------------------- */
 
@@ -377,6 +464,7 @@ function loadStudentIntoForm(s) {
   editingOriginalTimestamp = s.timestamp || null;
   populateFormFields(s);
   populateSubjectsFromData(s.subjects);
+  updateBmi(); // re-derive from the loaded height/weight rather than trust a stale stored value
   document.getElementById('submitBtn').textContent = 'Update';
   document.getElementById('editBanner').style.display = 'flex';
   document.getElementById('editBannerName').textContent = s.fullName || '';
@@ -423,8 +511,9 @@ document.getElementById('profileForm').addEventListener('submit', function(e) {
   const data = {};
   new FormData(form).forEach(function(v, k) { if (k !== 'photo') data[k] = v; });
   data.caste = 'BHIL';
-  data.casteCategory = 'ST';
   data.photoBase64 = photoBase64;
+  // Disabled fields are excluded from FormData, so their values are read directly.
+  data.bmi = document.querySelector('[name="bmi"]').value;
 
   if (!data.house || data.house.indexOf(' - ') === -1) {
     status.className = 'error';
@@ -524,6 +613,7 @@ document.getElementById('searchBtn').addEventListener('click', function() {
         '</div>' +
         '<div style="display:flex;gap:6px;flex-shrink:0;">' +
           '<button type="button" class="secondary editBtn">Edit</button>' +
+          '<button type="button" class="secondary deleteBtn" style="color:#ff3b30;">Delete</button>' +
           '<button type="button" class="dlBtn">Download</button>' +
         '</div>';
       const dlBtn = card.querySelector('.dlBtn');
@@ -544,6 +634,20 @@ document.getElementById('searchBtn').addEventListener('click', function() {
       const editBtn = card.querySelector('.editBtn');
       editBtn.addEventListener('click', function() {
         loadStudentIntoForm(r);
+      });
+      const deleteBtn = card.querySelector('.deleteBtn');
+      deleteBtn.addEventListener('click', function() {
+        const sure = confirm('Delete ' + (r.fullName || 'this student') + '\'s record permanently? This cannot be undone.');
+        if (!sure) return;
+        deleteBtn.disabled = true;
+        deleteBtn.innerHTML = '<span class="spinner" style="border-color:rgba(255,59,48,0.3);border-top-color:#ff3b30;"></span>';
+        db.collection('students').doc(r._id).delete().then(function() {
+          card.remove();
+        }).catch(function(err) {
+          deleteBtn.disabled = false;
+          deleteBtn.textContent = 'Delete';
+          alert('Error deleting: ' + err.message);
+        });
       });
       resultsList.appendChild(card);
     });
@@ -752,15 +856,19 @@ function buildFullStudentHtml(d, photoDataUrl) {
   html += row2('Category (Hostel)', d.category, 'Date of Birth', d.dob);
   html += '</table>';
 
+  html += '<div class="pdfSectionTitle">Identification &amp; Admission</div><table class="pdfFieldTable">';
+  html += fieldRows(['srAdmissionNo','dateOfAdmission','apaarId','abhaId'], d);
+  html += '</table>';
+
   html += '<div class="pdfSectionTitle">Contact Information</div><table class="pdfFieldTable">';
-  html += fieldRows(['gender','email','distanceFromSchool','aadhaarNo','phone1','phone2','phone3',
+  html += fieldRows(['gender','email','distanceFromSchool','pinCode','aadhaarNo','phone1','phone2','phone3',
     'fatherName','motherName','fatherAadhaar','motherAadhaar'], d);
   html += fullRow('Address', d.address);
   html += '</table>';
 
   html += '<div class="pdfSectionTitle">Personal Information</div><table class="pdfFieldTable">';
-  html += fieldRows(['caste','casteCategory','bloodGroup','religion','age','satsNo','penNo',
-    'nearestRelative','nearestRelativeMobile'], d);
+  html += fieldRows(['caste','casteCategory','bloodGroup','religion','age','penNo',
+    'height','weight','bmi','sickleCell','identityMark','povertyLine'], d);
   html += '</table>';
 
   html += '<div class="pdfSectionTitle">Family Information</div><table class="pdfFieldTable">';
@@ -775,7 +883,11 @@ function buildFullStudentHtml(d, photoDataUrl) {
 
   html += '<div class="pdfSectionTitle">Family Background</div><table class="pdfFieldTable">';
   html += fieldRows(['familyType','siblingsSister','siblingsBrother','fatherEducation','motherEducation',
-    'emergencyContact','height','weight','mbs','chest'], d);
+    'emergencyContact'], d);
+  html += '</table>';
+
+  html += '<div class="pdfSectionTitle">Bank Details</div><table class="pdfFieldTable">';
+  html += fieldRows(['bankName','bankAccountName','ifscCode','accountNumber'], d);
   html += '</table>';
 
   html += '<div class="pdfSectionTitle">Academic Information</div><table class="pdfFieldTable">';
@@ -924,4 +1036,3 @@ async function renderStudentIntoDoc(doc, data, isNotFirstStudent) {
 async function generateStudentPdf(data) {
   return renderStudentIntoDoc(null, data, false);
 }
-
