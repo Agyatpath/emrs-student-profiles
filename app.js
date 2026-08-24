@@ -79,8 +79,8 @@ const SECTIONS = [
     { key: 'house', label: 'House', type: 'houseSelect', required: true },
     { key: 'dob', label: 'Date of Birth', type: 'dateField', required: true },
     { key: 'gender', label: 'Gender', type: 'select', required: true, options: ['Male','Female'] },
-    { key: 'caste', label: 'Caste', type: 'fixed', value: 'BHIL', required: true },
-    { key: 'casteCategory', label: 'Category', type: 'select', required: true, options: ['Bhil','Meena','Other'] },
+    { key: 'caste', label: 'Caste', type: 'select', required: true, options: ['Bhil','Meena','Other'] },
+    { key: 'casteCategory', label: 'Category', type: 'fixed', value: 'ST', required: true },
     { key: 'photo', label: 'Photo', type: 'photo' }
   ]},
   { title: 'Identification & Admission', fields: [
@@ -510,7 +510,7 @@ document.getElementById('profileForm').addEventListener('submit', function(e) {
 
   const data = {};
   new FormData(form).forEach(function(v, k) { if (k !== 'photo') data[k] = v; });
-  data.caste = 'BHIL';
+  data.casteCategory = 'ST';
   data.photoBase64 = photoBase64;
   // Disabled fields are excluded from FormData, so their values are read directly.
   data.bmi = document.querySelector('[name="bmi"]').value;
