@@ -76,7 +76,7 @@ const SECTIONS = [
     { key: 'fullName', label: 'Full Name', type: 'text', required: true },
     { key: 'className', label: 'Class', type: 'select', required: true, options: [6,7,8,9,10,11,12] },
     { key: 'section', label: 'Section', type: 'select', required: true, options: ['A','B','Science','Arts'] },
-    { key: 'house', label: 'House', type: 'houseSelect', required: true },
+    { key: 'house', label: 'House', type: 'houseSelect' },
     { key: 'dob', label: 'Date of Birth', type: 'dateField', required: true },
     { key: 'gender', label: 'Gender', type: 'select', required: true, options: ['Male','Female'] },
     { key: 'caste', label: 'Caste', type: 'select', required: true, options: ['Bhil','Meena','Other'] },
@@ -98,7 +98,7 @@ const SECTIONS = [
     { key: 'aadhaarNo', label: 'Aadhaar No. (12 digits)', type: 'text', numeric: true, maxLength: 12 },
     { key: 'fatherAadhaar', label: "Father's Aadhaar No. (12 digits)", type: 'text', numeric: true, maxLength: 12 },
     { key: 'motherAadhaar', label: "Mother's Aadhaar No. (12 digits)", type: 'text', numeric: true, maxLength: 12 },
-    { key: 'phone1', label: 'WhatsApp Number (10 digits)', type: 'text', numeric: true, maxLength: 10, required: true },
+    { key: 'phone1', label: 'WhatsApp Number (10 digits)', type: 'text', numeric: true, maxLength: 10 },
     { key: 'phone2', label: 'Phone Number (2) (10 digits)', type: 'text', numeric: true, maxLength: 10 },
     { key: 'phone3', label: 'Phone Number (3) (10 digits)', type: 'text', numeric: true, maxLength: 10 },
     { key: 'address', label: 'Address', type: 'textarea', wide: true, textSize: 'extraTall',
@@ -515,14 +515,15 @@ document.getElementById('profileForm').addEventListener('submit', function(e) {
   // Disabled fields are excluded from FormData, so their values are read directly.
   data.bmi = document.querySelector('[name="bmi"]').value;
 
-  if (!data.house || data.house.indexOf(' - ') === -1) {
-    status.className = 'error';
-    status.textContent = 'Please select a House.';
-    return;
+  // House is now optional — split it into house/category only if one was actually chosen.
+  if (data.house && data.house.indexOf(' - ') !== -1) {
+    const parts = data.house.split(' - ');
+    data.house = parts[0];
+    data.category = parts[1];
+  } else {
+    data.house = '';
+    data.category = '';
   }
-  const parts = data.house.split(' - ');
-  data.house = parts[0];
-  data.category = parts[1];
 
   data.subjects = collectSubjectsData();
 
