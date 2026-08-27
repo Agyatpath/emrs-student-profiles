@@ -91,14 +91,6 @@
   }
   @media (max-width: 480px) { .fabLabel { display: none; } }
 
-  /* ---- Result Portal panel ---- */
-  .credRow { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
-  .credRow .credBox {
-    flex: 1; background: var(--ios-bg); border: 1px solid var(--ios-border); border-radius: var(--radius-sm);
-    padding: 10px 12px; font-size: 15px; font-family: monospace; letter-spacing: 0.5px; min-height: auto;
-  }
-  .credRow button { width: auto; padding: 10px 12px; min-height: auto; flex-shrink: 0; }
-  .credRow button.iconBtn { background: rgba(120,120,128,0.14); color: var(--maroon); font-size: 16px; }
   fieldset { border: none; background: var(--ios-card); border-radius: var(--radius); margin: 14px 0; padding: 14px 14px 16px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
   legend { font-weight: 700; color: var(--maroon); padding: 0 4px; font-size: 14.5px; }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; }
@@ -249,20 +241,8 @@
   <div id="resultPortalView" class="view">
     <h1>Result Portal</h1>
     <fieldset>
-      <legend>Login Details</legend>
-      <div class="note">These are the Result Portal's own login credentials — separate from your login here. Copy each one and paste it into the Result Portal's login page; you'll still need to solve its CAPTCHA and enter its PIN yourself.</div>
-      <label>Username</label>
-      <div class="credRow">
-        <div class="credBox" id="rpUsername">ADMIN1</div>
-        <button type="button" class="iconBtn secondary" id="rpCopyUsername" title="Copy">&#128203;</button>
-      </div>
-      <label>Password</label>
-      <div class="credRow">
-        <div class="credBox" id="rpPassword">••••••••••</div>
-        <button type="button" class="iconBtn secondary" id="rpTogglePassword" title="Show/Hide">&#128065;</button>
-        <button type="button" class="iconBtn secondary" id="rpCopyPassword" title="Copy">&#128203;</button>
-      </div>
-      <div id="rpCopyStatus" class="note"></div>
+      <legend>EMRS Next</legend>
+      <div class="note">Opens the Result Portal in a new tab. You'll need to sign in there with its own login, CAPTCHA, and PIN.</div>
       <button type="button" id="rpOpenPortalBtn">Open Result Portal &#8599;</button>
     </fieldset>
   </div>

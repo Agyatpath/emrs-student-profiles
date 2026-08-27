@@ -439,43 +439,9 @@ fabAddBtn.addEventListener('click', function() { showView('fill'); });
 showView('home'); // set correct initial visibility for the Home button / FAB on first load
 
 /* ------------------------- RESULT PORTAL PANEL ------------------------- */
-// These are the Result Portal's OWN login credentials (a separate system, not ours).
-// Shown here purely for convenience — copy/paste into their login page, then solve
-// their CAPTCHA and PIN by hand, same as always. See earlier discussion: no automatic
-// cross-site login is possible here, by design of their security measures.
 
 const RESULT_PORTAL_URL = 'https://emrsnext.com/result/index.php';
-const RESULT_PORTAL_USERNAME = 'ADMIN1';
-const RESULT_PORTAL_PASSWORD = 'gekm@2835';
 
-document.getElementById('rpUsername').textContent = RESULT_PORTAL_USERNAME;
-let rpPasswordVisible = false;
-function renderRpPassword() {
-  document.getElementById('rpPassword').textContent = rpPasswordVisible
-    ? RESULT_PORTAL_PASSWORD
-    : '•'.repeat(RESULT_PORTAL_PASSWORD.length);
-}
-renderRpPassword();
-
-document.getElementById('rpTogglePassword').addEventListener('click', function() {
-  rpPasswordVisible = !rpPasswordVisible;
-  renderRpPassword();
-});
-
-function copyToClipboard(text, statusEl, label) {
-  navigator.clipboard.writeText(text).then(function() {
-    statusEl.textContent = label + ' copied.';
-    setTimeout(function() { statusEl.textContent = ''; }, 2000);
-  }).catch(function() {
-    statusEl.textContent = 'Could not copy — please copy it manually.';
-  });
-}
-document.getElementById('rpCopyUsername').addEventListener('click', function() {
-  copyToClipboard(RESULT_PORTAL_USERNAME, document.getElementById('rpCopyStatus'), 'Username');
-});
-document.getElementById('rpCopyPassword').addEventListener('click', function() {
-  copyToClipboard(RESULT_PORTAL_PASSWORD, document.getElementById('rpCopyStatus'), 'Password');
-});
 document.getElementById('rpOpenPortalBtn').addEventListener('click', function() {
   window.open(RESULT_PORTAL_URL, '_blank', 'noopener');
 });
