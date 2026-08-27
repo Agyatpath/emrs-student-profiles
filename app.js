@@ -406,19 +406,78 @@ document.getElementById('photoInput').addEventListener('change', function(e) {
   reader.readAsDataURL(file);
 });
 
-/* ------------------------- TAB SWITCHING ------------------------- */
+/* ------------------------- VIEW NAVIGATION (Home / Fill / Manage / Result Portal) ------------------------- */
 
-const tabFill = document.getElementById('tabFill');
-const tabManage = document.getElementById('tabManage');
+const homeView = document.getElementById('homeView');
 const fillView = document.getElementById('fillView');
 const manageView = document.getElementById('manageView');
-tabFill.addEventListener('click', function() {
-  tabFill.classList.add('active'); tabManage.classList.remove('active');
-  manageView.classList.remove('active'); fillView.classList.add('active');
+const resultPortalView = document.getElementById('resultPortalView');
+const homeBtn = document.getElementById('homeBtn');
+const fabAddBtn = document.getElementById('fabAddBtn');
+const fabLabel = document.getElementById('fabLabel');
+const topbarSubtitle = document.getElementById('topbarSubtitle');
+
+const ALL_VIEWS = [homeView, fillView, manageView, resultPortalView];
+
+function showView(name) {
+  ALL_VIEWS.forEach(function(v) { v.classList.remove('active'); });
+  const isHome = name === 'home';
+  homeBtn.style.display = isHome ? 'none' : 'flex';
+  fabAddBtn.style.display = isHome ? 'flex' : 'none';
+  fabLabel.style.display = isHome ? 'block' : 'none';
+  if (name === 'home') { homeView.classList.add('active'); topbarSubtitle.textContent = 'Student Profile System'; }
+  else if (name === 'fill') { fillView.classList.add('active'); topbarSubtitle.textContent = 'Add / Edit Student'; }
+  else if (name === 'manage') { manageView.classList.add('active'); topbarSubtitle.textContent = 'View & Manage Students'; }
+  else if (name === 'resultPortal') { resultPortalView.classList.add('active'); topbarSubtitle.textContent = 'Result Portal'; }
+  window.scrollTo(0, 0);
+}
+
+homeBtn.addEventListener('click', function() { showView('home'); });
+document.getElementById('goManageCard').addEventListener('click', function() { showView('manage'); });
+document.getElementById('goResultPortalCard').addEventListener('click', function() { showView('resultPortal'); });
+fabAddBtn.addEventListener('click', function() { showView('fill'); });
+showView('home'); // set correct initial visibility for the Home button / FAB on first load
+
+/* ------------------------- RESULT PORTAL PANEL ------------------------- */
+// These are the Result Portal's OWN login credentials (a separate system, not ours).
+// Shown here purely for convenience — copy/paste into their login page, then solve
+// their CAPTCHA and PIN by hand, same as always. See earlier discussion: no automatic
+// cross-site login is possible here, by design of their security measures.
+
+const RESULT_PORTAL_URL = 'https://emrsnext.com/result/index.php';
+const RESULT_PORTAL_USERNAME = 'ADMIN1';
+const RESULT_PORTAL_PASSWORD = 'gekm@2835';
+
+document.getElementById('rpUsername').textContent = RESULT_PORTAL_USERNAME;
+let rpPasswordVisible = false;
+function renderRpPassword() {
+  document.getElementById('rpPassword').textContent = rpPasswordVisible
+    ? RESULT_PORTAL_PASSWORD
+    : '•'.repeat(RESULT_PORTAL_PASSWORD.length);
+}
+renderRpPassword();
+
+document.getElementById('rpTogglePassword').addEventListener('click', function() {
+  rpPasswordVisible = !rpPasswordVisible;
+  renderRpPassword();
 });
-tabManage.addEventListener('click', function() {
-  tabManage.classList.add('active'); tabFill.classList.remove('active');
-  fillView.classList.remove('active'); manageView.classList.add('active');
+
+function copyToClipboard(text, statusEl, label) {
+  navigator.clipboard.writeText(text).then(function() {
+    statusEl.textContent = label + ' copied.';
+    setTimeout(function() { statusEl.textContent = ''; }, 2000);
+  }).catch(function() {
+    statusEl.textContent = 'Could not copy — please copy it manually.';
+  });
+}
+document.getElementById('rpCopyUsername').addEventListener('click', function() {
+  copyToClipboard(RESULT_PORTAL_USERNAME, document.getElementById('rpCopyStatus'), 'Username');
+});
+document.getElementById('rpCopyPassword').addEventListener('click', function() {
+  copyToClipboard(RESULT_PORTAL_PASSWORD, document.getElementById('rpCopyStatus'), 'Password');
+});
+document.getElementById('rpOpenPortalBtn').addEventListener('click', function() {
+  window.open(RESULT_PORTAL_URL, '_blank', 'noopener');
 });
 
 /* ------------------------- EDIT AN EXISTING STUDENT ------------------------- */
@@ -468,8 +527,7 @@ function loadStudentIntoForm(s) {
   document.getElementById('submitBtn').textContent = 'Update';
   document.getElementById('editBanner').style.display = 'flex';
   document.getElementById('editBannerName').textContent = s.fullName || '';
-  tabFill.click();
-  window.scrollTo(0, 0);
+  showView('fill');
 }
 
 document.getElementById('cancelEditBtn').addEventListener('click', function() {
@@ -486,10 +544,12 @@ document.getElementById('cancelEditBtn').addEventListener('click', function() {
   const mergeCategory = document.getElementById('mergeCategory');
   const exportHouse = document.getElementById('exportHouse');
   const exportCategory = document.getElementById('exportCategory');
+  const quickListHouse = document.getElementById('quickListHouse');
   HOUSES.forEach(function(h) {
     searchHouse.innerHTML += '<option value="' + h + '">' + h + '</option>';
     mergeHouse.innerHTML += '<option value="' + h + '">' + h + '</option>';
     exportHouse.innerHTML += '<option value="' + h + '">' + h + '</option>';
+    quickListHouse.innerHTML += '<option value="' + h + '">' + h + '</option>';
   });
   for (let c = 6; c <= 12; c++) searchClass.innerHTML += '<option value="' + c + '">' + c + '</option>';
   CATEGORIES.forEach(function(c) {
@@ -772,124 +832,62 @@ document.getElementById('exportCsvBtn').addEventListener('click', function() {
   });
 });
 
-/* ------------------------- BULK IMPORT STUDENTS (CSV) ------------------------- */
-// Built for a UDISE+-style export. Maps whatever columns exist in the source file to
-// our field keys; anything the source file doesn't have (House, second parent's name,
-// photo, etc.) is deliberately left blank so it's obviously waiting for a teacher to
-// fill in via Edit — imported records bypass the web form's own "required field" rules
-// entirely, since they're written directly to Firestore.
+/* ------------------------- QUICK LIST BY HOUSE (CSV) ------------------------- */
+// A simple, focused list — Name, Class, Section, Father's Name, Mother's Name — for one
+// house at a time. Separate from the fuller "Export Student List" above, which includes
+// more columns and an All Houses option.
 
-function mapCsvRowToStudent(row) {
-  const fullName = [row['First Name'], row['Middle Name'], row['Last Name']]
-    .filter(function(s) { return s && s.trim(); }).join(' ').trim().toUpperCase();
-
-  // Source format is YYYY-MM-DD; ours is DD/MM/YYYY.
-  let dob = '';
-  const dobParts = (row['Dob'] || '').split('-');
-  if (dobParts.length === 3) dob = dobParts[2] + '/' + dobParts[1] + '/' + dobParts[0];
-
-  // "Tribe" -> our Caste dropdown (Bhil/Meena/Other) — must match an option exactly.
-  const tribeMap = { 'Bhil': 'Bhil', 'Mina': 'Meena' };
-  const caste = tribeMap[(row['Tribe'] || '').trim()] || 'Other';
-
-  const parentName = [row['Parent First Name'], row['Parent Middle Name'], row['Parent Last Name']]
-    .filter(function(s) { return s && s.trim(); }).join(' ').trim().toUpperCase();
-  const relation = (row['Parent Relation'] || '').trim().toLowerCase();
-  const fatherName = relation === 'father' ? parentName : '';
-  const motherName = relation === 'mother' ? parentName : '';
-  // Guardian-relation rows (rare) leave both blank — teacher assigns correctly by hand.
-
-  const phoneDigits = (row['Phone No'] || '').replace(/\D/g, '');
-  const phone1 = phoneDigits.length === 10 ? phoneDigits : '';
-
-  const aadhaarDigits = (row['Aadhaar No'] || '').replace(/\D/g, '');
-  const pinDigits = (row['Pincode'] || '').replace(/\D/g, '').slice(0, 6);
-  const srNo = (row['Student Identity No'] || '').replace(/\D/g, '');
-
-  return {
-    fullName: fullName,
-    className: (row['Class'] || '').trim(),
-    section: (row['Section'] || '').trim(),
-    house: '', category: '', // not present in source data — assigned by school later
-    dob: dob,
-    gender: (row['Gender'] || '').trim(), // source values already match our Male/Female options
-    caste: caste,
-    casteCategory: 'ST',
-    fatherName: fatherName,
-    motherName: motherName,
-    phone1: phone1,
-    aadhaarNo: aadhaarDigits,
-    address: (row['Address'] || '').trim().toUpperCase(),
-    pinCode: pinDigits,
-    religion: (row['Religion'] || '').trim(), // source values already match our dropdown options
-    srAdmissionNo: srNo,
-    photoBase64: '', // source file only lists filenames, not actual image data
-    subjects: { subjectNames: [], assessments: [] },
-    importedFromCsv: true,
-    timestamp: firebase.firestore.FieldValue.serverTimestamp()
-  };
-}
-
-document.getElementById('importCsvBtn').addEventListener('click', function() {
+document.getElementById('quickListBtn').addEventListener('click', function() {
   const btn = this;
-  const status = document.getElementById('importStatus');
-  const fileInput = document.getElementById('importCsvFile');
-  const targetYear = document.getElementById('importAcademicYear').value.trim();
-  const file = fileInput.files[0];
-
-  if (!file) { status.textContent = 'Choose a CSV file first.'; return; }
-  if (!targetYear) { status.textContent = 'Enter the Academic Year to import.'; return; }
+  const status = document.getElementById('quickListStatus');
+  const house = document.getElementById('quickListHouse').value;
 
   btn.disabled = true;
-  status.innerHTML = '<span class="spinner dark"></span>Reading file...';
+  status.innerHTML = '<span class="spinner dark"></span>Fetching students...';
 
-  Papa.parse(file, {
-    header: true,
-    skipEmptyLines: true,
-    complete: function(results) {
-      const targetRows = results.data.filter(function(r) {
-        // Skip "Tc" (transferred out) students — only currently-active students for this
-        // academic year get imported.
-        return (r['Academic Year'] || '').trim() === targetYear &&
-               (r['Student Status'] || '').trim() !== 'Tc';
-      });
-      if (!targetRows.length) {
-        btn.disabled = false;
-        status.textContent = 'No rows found with Academic Year = "' + targetYear + '".';
-        return;
-      }
-      importRows(targetRows, btn, status);
-    },
-    error: function(err) {
-      btn.disabled = false;
-      status.textContent = 'Error reading CSV: ' + err.message;
-    }
-  });
-});
+  db.collection('students').where('house', '==', house).get().then(function(snap) {
+    btn.disabled = false;
+    const rows = [];
+    snap.forEach(function(doc) { rows.push(doc.data()); });
 
-async function importRows(rows, btn, status) {
-  const CHUNK = 400; // stays safely under Firestore's 500-operation batch limit
-  let imported = 0;
-  for (let start = 0; start < rows.length; start += CHUNK) {
-    const chunk = rows.slice(start, start + CHUNK);
-    const batch = db.batch();
-    chunk.forEach(function(row) {
-      const ref = db.collection('students').doc();
-      batch.set(ref, mapCsvRowToStudent(row));
-    });
-    try {
-      await batch.commit();
-      imported += chunk.length;
-      status.innerHTML = '<span class="spinner dark"></span>Imported ' + imported + ' of ' + rows.length + '...';
-    } catch (err) {
-      btn.disabled = false;
-      status.textContent = 'Error after importing ' + imported + ' — ' + err.message;
+    if (!rows.length) {
+      status.textContent = 'No students found for ' + house + '.';
       return;
     }
-  }
-  btn.disabled = false;
-  status.textContent = 'Done — ' + imported + ' student(s) imported. Teachers can now use Edit in Search to fill in House, missing parent, photo, and anything else.';
-}
+
+    rows.sort(function(a, b) {
+      if (String(a.className) !== String(b.className)) return Number(a.className) - Number(b.className);
+      if ((a.section || '') !== (b.section || '')) return (a.section || '').localeCompare(b.section || '');
+      return (a.fullName || '').localeCompare(b.fullName || '');
+    });
+
+    function csvEscape(v) {
+      v = (v === undefined || v === null) ? '' : String(v);
+      if (/[",\n]/.test(v)) v = '"' + v.replace(/"/g, '""') + '"';
+      return v;
+    }
+
+    const headers = ['Student Name', 'Class', 'Section', "Father's Name", "Mother's Name"];
+    let csv = headers.map(csvEscape).join(',') + '\r\n';
+    rows.forEach(function(r) {
+      const line = [r.fullName, r.className, r.section, r.fatherName, r.motherName];
+      csv += line.map(csvEscape).join(',') + '\r\n';
+    });
+
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = house.replace(/\s+/g, '') + '_QuickList.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    status.textContent = 'Downloaded ' + rows.length + ' student(s) for ' + house + '.';
+  }).catch(function(err) {
+    btn.disabled = false;
+    status.textContent = 'Error: ' + err.message;
+  });
+});
 
 /* ============================================================================
    PDF RENDERING ENGINE — builds the same branded two-page layout as before,

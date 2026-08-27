@@ -38,7 +38,6 @@
   .loginCard button { width: 100%; }
   #loginError { color: #ff3b30; font-size: 12.5px; min-height: 16px; margin-top: 8px; }
   .logoutBtn { width: auto !important; padding: 6px 12px !important; font-size: 12px !important; min-height: auto !important; flex-shrink: 0; }
-  a.resultPortalLink { display: inline-flex; align-items: center; text-decoration: none; }
 
   .topbar {
     position: sticky; top: 0; z-index: 20; background: rgba(255,255,255,0.92);
@@ -49,13 +48,57 @@
   .topbar .brandText { flex: 1; min-width: 0; }
   .topbar .brandSchool { font-size: 10.5px; font-weight: 700; color: var(--maroon); line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .topbar .brandForm { font-size: 10.5px; color: var(--ios-gray); font-weight: 500; }
-  .segControl { display: flex; background: rgba(120,120,128,0.12); border-radius: 9px; padding: 2px; flex-shrink: 0; }
-  .segControl button { border: none; background: transparent; padding: 6px 11px; font-size: 12.5px; font-weight: 600; color: #1c1c1e; border-radius: 7px; cursor: pointer; transition: background .18s ease; white-space: nowrap; min-height: auto; width: auto; }
-  .segControl button.active { background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.15); color: var(--maroon); }
+  .homeBtn {
+    width: auto !important; padding: 7px 13px !important; font-size: 12.5px !important; font-weight: 600;
+    min-height: auto !important; background: rgba(120,120,128,0.14); color: var(--maroon); border: none;
+    border-radius: 9px; cursor: pointer; display: flex; align-items: center; gap: 5px; flex-shrink: 0;
+  }
   .view { display: none; animation: fadeSlideIn .25s ease; }
   .view.active { display: block; }
   @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
   h1 { color: var(--maroon); font-size: 19px; margin: 18px 0 10px; }
+
+  /* ---- Home screen ---- */
+  .homeHeading { color: var(--maroon); font-size: 22px; margin: 22px 0 4px; }
+  .homeSubhead { color: var(--ios-gray); font-size: 14px; margin: 0 0 22px; }
+  .menuGrid { display: grid; grid-template-columns: 1fr; gap: 14px; }
+  @media (min-width: 700px) { .menuGrid { grid-template-columns: 1fr 1fr; } }
+  .menuCard {
+    background: #fff; border-radius: var(--radius); padding: 22px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    display: flex; align-items: center; gap: 16px; cursor: pointer; border: 1px solid var(--ios-border);
+    transition: transform .12s ease;
+  }
+  .menuCard:active { transform: scale(0.98); }
+  .menuCard .icon {
+    width: 52px; height: 52px; border-radius: 14px; display: flex; align-items: center; justify-content: center;
+    font-size: 24px; flex-shrink: 0; color: #fff;
+  }
+  .menuCard.manage .icon { background: linear-gradient(135deg, var(--maroon), var(--maroon-dark)); }
+  .menuCard.result .icon { background: linear-gradient(135deg, var(--gold), #8a6a1f); }
+  .menuCard .titleText { font-size: 16.5px; font-weight: 700; color: #1c1c1e; margin-bottom: 3px; }
+  .menuCard .descText { font-size: 12.5px; color: var(--ios-gray); line-height: 1.4; }
+  .menuCard .chevron { margin-left: auto; color: var(--ios-gray); font-size: 18px; flex-shrink: 0; }
+  .fab {
+    position: fixed; bottom: 26px; right: 22px; width: 60px; height: 60px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--maroon), var(--maroon-dark)); color: #fff; border: none;
+    font-size: 30px; font-weight: 400; display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 6px 18px rgba(106,27,26,0.4); cursor: pointer; line-height: 1; z-index: 15; min-height: auto;
+  }
+  .fab:active { transform: scale(0.94); background: var(--maroon-dark); }
+  .fabLabel {
+    position: fixed; bottom: 44px; right: 92px; background: #1c1c1e; color: #fff; font-size: 12px;
+    padding: 6px 10px; border-radius: 8px; white-space: nowrap; opacity: 0.92; z-index: 15;
+  }
+  @media (max-width: 480px) { .fabLabel { display: none; } }
+
+  /* ---- Result Portal panel ---- */
+  .credRow { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+  .credRow .credBox {
+    flex: 1; background: var(--ios-bg); border: 1px solid var(--ios-border); border-radius: var(--radius-sm);
+    padding: 10px 12px; font-size: 15px; font-family: monospace; letter-spacing: 0.5px; min-height: auto;
+  }
+  .credRow button { width: auto; padding: 10px 12px; min-height: auto; flex-shrink: 0; }
+  .credRow button.iconBtn { background: rgba(120,120,128,0.14); color: var(--maroon); font-size: 16px; }
   fieldset { border: none; background: var(--ios-card); border-radius: var(--radius); margin: 14px 0; padding: 14px 14px 16px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
   legend { font-weight: 700; color: var(--maroon); padding: 0 4px; font-size: 14.5px; }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; }
@@ -170,21 +213,61 @@
 </div>
 
 <div class="topbar">
+  <button type="button" id="homeBtn" class="homeBtn" style="display:none;">&#8592; Home</button>
   <img class="brandLogo" id="brandLogoImg" alt="EMRS">
   <div class="brandText">
     <div class="brandSchool">EKLAVYA MODEL RESIDENTIAL SCHOOL, BANSLA-BAGIDORA</div>
-    <div class="brandForm">Student Profile Form</div>
+    <div class="brandForm" id="topbarSubtitle">Student Profile Form</div>
   </div>
-  <a href="https://emrsnext.com/result/index.php" target="_blank" rel="noopener" class="secondary logoutBtn resultPortalLink">Result Portal</a>
   <button type="button" id="logoutBtn" class="secondary logoutBtn">Log Out</button>
-  <div class="segControl">
-    <button type="button" id="tabFill" class="active">Fill Form</button>
-    <button type="button" id="tabManage">View / Manage</button>
-  </div>
 </div>
 
 <div class="container">
-  <div id="fillView" class="view active">
+  <div id="homeView" class="view active">
+    <div class="homeHeading">Welcome</div>
+    <div class="homeSubhead">Choose what you'd like to do.</div>
+    <div class="menuGrid">
+      <div class="menuCard manage" id="goManageCard">
+        <div class="icon">&#128269;</div>
+        <div>
+          <div class="titleText">View &amp; Manage Students</div>
+          <div class="descText">Search, edit, delete, download, merge by house, or export the student list</div>
+        </div>
+        <div class="chevron">&#8250;</div>
+      </div>
+      <div class="menuCard result" id="goResultPortalCard">
+        <div class="icon">&#128279;</div>
+        <div>
+          <div class="titleText">Result Portal</div>
+          <div class="descText">Login details and a link to the EMRS Next result entry system</div>
+        </div>
+        <div class="chevron">&#8250;</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="resultPortalView" class="view">
+    <h1>Result Portal</h1>
+    <fieldset>
+      <legend>Login Details</legend>
+      <div class="note">These are the Result Portal's own login credentials — separate from your login here. Copy each one and paste it into the Result Portal's login page; you'll still need to solve its CAPTCHA and enter its PIN yourself.</div>
+      <label>Username</label>
+      <div class="credRow">
+        <div class="credBox" id="rpUsername">ADMIN1</div>
+        <button type="button" class="iconBtn secondary" id="rpCopyUsername" title="Copy">&#128203;</button>
+      </div>
+      <label>Password</label>
+      <div class="credRow">
+        <div class="credBox" id="rpPassword">••••••••••</div>
+        <button type="button" class="iconBtn secondary" id="rpTogglePassword" title="Show/Hide">&#128065;</button>
+        <button type="button" class="iconBtn secondary" id="rpCopyPassword" title="Copy">&#128203;</button>
+      </div>
+      <div id="rpCopyStatus" class="note"></div>
+      <button type="button" id="rpOpenPortalBtn">Open Result Portal &#8599;</button>
+    </fieldset>
+  </div>
+
+  <div id="fillView" class="view">
     <div id="editBanner" style="display:none; align-items:center; justify-content:space-between; gap:10px; background:#fff8e6; border:1px solid #e8d68a; border-radius:12px; padding:10px 14px; margin:14px 0; font-size:13.5px; color:#6a1b1a;">
       <span>Editing: <strong id="editBannerName"></strong></span>
       <button type="button" id="cancelEditBtn" class="secondary" style="width:auto; padding:7px 14px; min-height:34px; font-size:13px;">Cancel</button>
@@ -273,20 +356,22 @@
     </fieldset>
 
     <fieldset>
-      <legend>Bulk Import Students (CSV)</legend>
-      <div class="note">Upload a UDISE+-style student export CSV. Only rows for the chosen Academic Year are imported, and students marked "Tc" (transferred out) are automatically skipped. Fields not present in the file (House, second parent's name, photo, etc.) are left blank for teachers to fill in later via Edit.</div>
+      <legend>Quick List by House</legend>
+      <div class="note">Downloads a simple list — Student Name, Class, Section, Father's Name, Mother's Name — for one House at a time.</div>
       <div class="grid">
         <div class="field">
-          <label>Academic Year (as written in the file)</label>
-          <input type="text" id="importAcademicYear" value="2026-2027" placeholder="e.g. 2026-2027">
+          <label>House</label>
+          <select id="quickListHouse"></select>
         </div>
       </div>
-      <input type="file" id="importCsvFile" accept=".csv" style="margin-bottom:10px;">
-      <button type="button" id="importCsvBtn">Import CSV</button>
-      <div id="importStatus" class="note" style="margin-top:8px;"></div>
+      <button type="button" id="quickListBtn">Download List</button>
+      <div id="quickListStatus" class="note" style="margin-top:8px;"></div>
     </fieldset>
   </div>
 </div>
+
+<div class="fabLabel" id="fabLabel" style="display:none;">Add New Student</div>
+<button class="fab" id="fabAddBtn" style="display:none;">+</button>
 
 <!-- Hidden off-screen template used to render each student's PDF pages -->
 <div id="pdfRoot"></div>
@@ -296,7 +381,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script src="logo-data.js"></script>
 <script src="firebase-config.js"></script>
 <script src="app.js"></script>
