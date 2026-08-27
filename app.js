@@ -772,6 +772,125 @@ document.getElementById('exportCsvBtn').addEventListener('click', function() {
   });
 });
 
+/* ------------------------- BULK IMPORT STUDENTS (CSV) ------------------------- */
+// Built for a UDISE+-style export. Maps whatever columns exist in the source file to
+// our field keys; anything the source file doesn't have (House, second parent's name,
+// photo, etc.) is deliberately left blank so it's obviously waiting for a teacher to
+// fill in via Edit — imported records bypass the web form's own "required field" rules
+// entirely, since they're written directly to Firestore.
+
+function mapCsvRowToStudent(row) {
+  const fullName = [row['First Name'], row['Middle Name'], row['Last Name']]
+    .filter(function(s) { return s && s.trim(); }).join(' ').trim().toUpperCase();
+
+  // Source format is YYYY-MM-DD; ours is DD/MM/YYYY.
+  let dob = '';
+  const dobParts = (row['Dob'] || '').split('-');
+  if (dobParts.length === 3) dob = dobParts[2] + '/' + dobParts[1] + '/' + dobParts[0];
+
+  // "Tribe" -> our Caste dropdown (Bhil/Meena/Other) — must match an option exactly.
+  const tribeMap = { 'Bhil': 'Bhil', 'Mina': 'Meena' };
+  const caste = tribeMap[(row['Tribe'] || '').trim()] || 'Other';
+
+  const parentName = [row['Parent First Name'], row['Parent Middle Name'], row['Parent Last Name']]
+    .filter(function(s) { return s && s.trim(); }).join(' ').trim().toUpperCase();
+  const relation = (row['Parent Relation'] || '').trim().toLowerCase();
+  const fatherName = relation === 'father' ? parentName : '';
+  const motherName = relation === 'mother' ? parentName : '';
+  // Guardian-relation rows (rare) leave both blank — teacher assigns correctly by hand.
+
+  const phoneDigits = (row['Phone No'] || '').replace(/\D/g, '');
+  const phone1 = phoneDigits.length === 10 ? phoneDigits : '';
+
+  const aadhaarDigits = (row['Aadhaar No'] || '').replace(/\D/g, '');
+  const pinDigits = (row['Pincode'] || '').replace(/\D/g, '').slice(0, 6);
+  const srNo = (row['Student Identity No'] || '').replace(/\D/g, '');
+
+  return {
+    fullName: fullName,
+    className: (row['Class'] || '').trim(),
+    section: (row['Section'] || '').trim(),
+    house: '', category: '', // not present in source data — assigned by school later
+    dob: dob,
+    gender: (row['Gender'] || '').trim(), // source values already match our Male/Female options
+    caste: caste,
+    casteCategory: 'ST',
+    fatherName: fatherName,
+    motherName: motherName,
+    phone1: phone1,
+    aadhaarNo: aadhaarDigits,
+    address: (row['Address'] || '').trim().toUpperCase(),
+    pinCode: pinDigits,
+    religion: (row['Religion'] || '').trim(), // source values already match our dropdown options
+    srAdmissionNo: srNo,
+    photoBase64: '', // source file only lists filenames, not actual image data
+    subjects: { subjectNames: [], assessments: [] },
+    importedFromCsv: true,
+    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+  };
+}
+
+document.getElementById('importCsvBtn').addEventListener('click', function() {
+  const btn = this;
+  const status = document.getElementById('importStatus');
+  const fileInput = document.getElementById('importCsvFile');
+  const targetYear = document.getElementById('importAcademicYear').value.trim();
+  const file = fileInput.files[0];
+
+  if (!file) { status.textContent = 'Choose a CSV file first.'; return; }
+  if (!targetYear) { status.textContent = 'Enter the Academic Year to import.'; return; }
+
+  btn.disabled = true;
+  status.innerHTML = '<span class="spinner dark"></span>Reading file...';
+
+  Papa.parse(file, {
+    header: true,
+    skipEmptyLines: true,
+    complete: function(results) {
+      const targetRows = results.data.filter(function(r) {
+        // Skip "Tc" (transferred out) students — only currently-active students for this
+        // academic year get imported.
+        return (r['Academic Year'] || '').trim() === targetYear &&
+               (r['Student Status'] || '').trim() !== 'Tc';
+      });
+      if (!targetRows.length) {
+        btn.disabled = false;
+        status.textContent = 'No rows found with Academic Year = "' + targetYear + '".';
+        return;
+      }
+      importRows(targetRows, btn, status);
+    },
+    error: function(err) {
+      btn.disabled = false;
+      status.textContent = 'Error reading CSV: ' + err.message;
+    }
+  });
+});
+
+async function importRows(rows, btn, status) {
+  const CHUNK = 400; // stays safely under Firestore's 500-operation batch limit
+  let imported = 0;
+  for (let start = 0; start < rows.length; start += CHUNK) {
+    const chunk = rows.slice(start, start + CHUNK);
+    const batch = db.batch();
+    chunk.forEach(function(row) {
+      const ref = db.collection('students').doc();
+      batch.set(ref, mapCsvRowToStudent(row));
+    });
+    try {
+      await batch.commit();
+      imported += chunk.length;
+      status.innerHTML = '<span class="spinner dark"></span>Imported ' + imported + ' of ' + rows.length + '...';
+    } catch (err) {
+      btn.disabled = false;
+      status.textContent = 'Error after importing ' + imported + ' — ' + err.message;
+      return;
+    }
+  }
+  btn.disabled = false;
+  status.textContent = 'Done — ' + imported + ' student(s) imported. Teachers can now use Edit in Search to fill in House, missing parent, photo, and anything else.';
+}
+
 /* ============================================================================
    PDF RENDERING ENGINE — builds the same branded two-page layout as before,
    but rendered by the real browser (via html2canvas) into a jsPDF document.

@@ -38,6 +38,7 @@
   .loginCard button { width: 100%; }
   #loginError { color: #ff3b30; font-size: 12.5px; min-height: 16px; margin-top: 8px; }
   .logoutBtn { width: auto !important; padding: 6px 12px !important; font-size: 12px !important; min-height: auto !important; flex-shrink: 0; }
+  a.resultPortalLink { display: inline-flex; align-items: center; text-decoration: none; }
 
   .topbar {
     position: sticky; top: 0; z-index: 20; background: rgba(255,255,255,0.92);
@@ -174,6 +175,7 @@
     <div class="brandSchool">EKLAVYA MODEL RESIDENTIAL SCHOOL, BANSLA-BAGIDORA</div>
     <div class="brandForm">Student Profile Form</div>
   </div>
+  <a href="https://emrsnext.com/result/index.php" target="_blank" rel="noopener" class="secondary logoutBtn resultPortalLink">Result Portal</a>
   <button type="button" id="logoutBtn" class="secondary logoutBtn">Log Out</button>
   <div class="segControl">
     <button type="button" id="tabFill" class="active">Fill Form</button>
@@ -269,6 +271,20 @@
       <button type="button" id="exportCsvBtn">Download Excel/CSV</button>
       <div id="exportStatus" class="note" style="margin-top:8px;"></div>
     </fieldset>
+
+    <fieldset>
+      <legend>Bulk Import Students (CSV)</legend>
+      <div class="note">Upload a UDISE+-style student export CSV. Only rows for the chosen Academic Year are imported, and students marked "Tc" (transferred out) are automatically skipped. Fields not present in the file (House, second parent's name, photo, etc.) are left blank for teachers to fill in later via Edit.</div>
+      <div class="grid">
+        <div class="field">
+          <label>Academic Year (as written in the file)</label>
+          <input type="text" id="importAcademicYear" value="2026-2027" placeholder="e.g. 2026-2027">
+        </div>
+      </div>
+      <input type="file" id="importCsvFile" accept=".csv" style="margin-bottom:10px;">
+      <button type="button" id="importCsvBtn">Import CSV</button>
+      <div id="importStatus" class="note" style="margin-top:8px;"></div>
+    </fieldset>
   </div>
 </div>
 
@@ -280,6 +296,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script src="logo-data.js"></script>
 <script src="firebase-config.js"></script>
 <script src="app.js"></script>
